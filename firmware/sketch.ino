@@ -10,11 +10,9 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // ==========================================
-// Konfigurasi Server / Backend API
-// Jika ditest via Wokwi browser, backend lokal bisa diakses
-// lewat URL publik (misal Ngrok / Cloudflared) atau IP publik server ECS Huawei Cloud.
+// Konfigurasi Server / Backend API (HTTP Tunnel Aktif)
 // ==========================================
-String serverUrl = "http://host.wokwi.internal:3000/api/telemetry";
+String serverUrl = "http://bpfzj-2400-9800-264-2864-8961-1b88-7281-1569.free.pinggy.net/api/telemetry";
 
 // ==========================================
 // Konfigurasi Pin Sensor & Indikator
@@ -34,6 +32,9 @@ const int PATIENT_ID = 1;
 // Interval Pengiriman Data (ms)
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 3000; // Kirim tiap 3 detik
+
+// Deklarasi fungsi pengiriman
+void sendTelemetryToCloud(float temp, float hum, int hr, String status);
 
 void setup() {
   Serial.begin(115200);
@@ -57,7 +58,7 @@ void setup() {
   // Koneksi WiFi (Wokwi-GUEST)
   Serial.print("[WiFi] Menghubungkan ke ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password, 6);
 
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -137,10 +138,17 @@ void loop() {
   }
 }
 
+// ==========================================
+// Fungsi Pengiriman Telemetri ke Backend API
+// Menggunakan Plain HTTP (Stabil & Kompatibel Wokwi)
+// ==========================================
 void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
+  WiFiClient client;
   HTTPClient http;
-  http.begin(serverUrl);
+
+  http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Pinggy-No-Screen", "1"); // Bypass halaman warning pinggy
 
   // Format Dokumen JSON
   StaticJsonDocument<256> doc;
@@ -162,7 +170,6 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
     Serial.printf("[Cloud Success] HTTP %d: %s\n", httpResponseCode, response.c_str());
   } else {
     Serial.printf("[Cloud Warning] POST gagal, kode: %s\n", http.errorToString(httpResponseCode).c_str());
-    Serial.println("  (Pastikan URL backend API sudah aktif dan bisa dijangkau)");
   }
 
   http.end();
