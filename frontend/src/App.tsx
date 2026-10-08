@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, BottomNav } from './components/Sidebar';
 import { Header } from './components/Header';
 import { StatCards } from './components/StatCards';
 import { SmoothBiometricChart } from './components/SmoothBiometricChart';
@@ -55,16 +55,16 @@ export const App: React.FC = () => {
   const latestMetric = metrics.length > 0 ? metrics[0] : null;
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex overflow-x-hidden">
-      {/* 1. Sleek Black Pill Sidebar (Style ref.png) */}
+    <div className="min-h-screen bg-[#F6F7F9] flex flex-col md:flex-row overflow-x-hidden">
+      {/* 1. Sleek Black Pill Sidebar (Tampil di Layar Tablet & Desktop >= md) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         alertCount={alerts.length}
       />
 
-      {/* 2. Main Dashboard Content */}
-      <main className="flex-1 p-4 lg:p-6 max-w-[1440px] mx-auto overflow-y-auto">
+      {/* 2. Main Dashboard Content (Diberi pb-24 agar tidak tertutup toolbar di HP) */}
+      <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-24 md:pb-6 overflow-y-auto">
         {/* Header Bar */}
         <Header
           isOnline={isOnline}
@@ -77,7 +77,7 @@ export const App: React.FC = () => {
         <StatCards latestMetric={latestMetric} />
 
         {/* Main Grid: Biometric Chart & Patient Profile */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mb-5 lg:mb-6">
           {/* Smooth Curved Line Chart (Pure SVG Bezier - 8 cols) */}
           <div className="lg:col-span-8">
             <SmoothBiometricChart metrics={metrics} />
@@ -94,6 +94,13 @@ export const App: React.FC = () => {
           <TelemetryFeed metrics={metrics} />
         </div>
       </main>
+
+      {/* 3. Floating Bottom Navigation Bar (Hanya Tampil di Layar HP < md) */}
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        alertCount={alerts.length}
+      />
     </div>
   );
 };
