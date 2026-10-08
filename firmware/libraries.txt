@@ -1,0 +1,4 @@
+# Wokwi Arduino Libraries
+DHT sensor library
+Adafruit Unified Sensor
+ArduinoJson
