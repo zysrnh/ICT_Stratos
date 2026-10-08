@@ -4,32 +4,40 @@ import { Header } from './components/Header';
 import { StatCards } from './components/StatCards';
 import { SmoothBiometricChart } from './components/SmoothBiometricChart';
 import { TelemetryFeed } from './components/TelemetryFeed';
-import { PatientProfileCard } from './components/PatientProfileCard';
-import { fetchLatestTelemetry, fetchActiveAlerts, checkServerHealth } from './services/api';
-import type { HealthMetric, HealthAlert } from './types/telemetry';
+import { fetchLatestTelemetry, fetchActiveAlerts, fetchPatients, checkServerHealth } from './services/api';
+import type { HealthMetric, HealthAlert, PatientInfo } from './types/telemetry';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [metrics, setMetrics] = useState<HealthMetric[]>([]);
   const [alerts, setAlerts] = useState<HealthAlert[]>([]);
+  const [patients, setPatients] = useState<PatientInfo[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<number>(1);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  // Auto-polling telemetry & alerts tiap 2 detik
+  // Ambil data master pasien sekali saat pertama kali mount
+  useEffect(() => {
+    fetchPatients().then((data) => {
+      if (data.length > 0) {
+        setPatients(data);
+      }
+    });
+  }, []);
+
+  // Auto-polling telemetry & alerts tiap 2 detik untuk pasien yang dipilih
   useEffect(() => {
     let isMounted = true;
 
     const loadData = async () => {
       try {
         const [latestMetrics, activeAlerts, healthy] = await Promise.all([
-          fetchLatestTelemetry(1),
+          fetchLatestTelemetry(selectedPatientId),
           fetchActiveAlerts(),
           checkServerHealth(),
         ]);
 
         if (isMounted) {
-          if (latestMetrics.length > 0) {
-            setMetrics(latestMetrics);
-          }
+          setMetrics(latestMetrics);
           setAlerts(activeAlerts);
           setIsOnline(healthy);
         }
@@ -40,62 +48,55 @@ export const App: React.FC = () => {
       }
     };
 
-    // Load pertama kali
+    // Load data pertama kali
     loadData();
 
-    // Interval polling tiap 2 detik
+    // Polling interval tiap 2 detik
     const timer = setInterval(loadData, 2000);
 
     return () => {
       isMounted = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [selectedPatientId]);
 
   const latestMetric = metrics.length > 0 ? metrics[0] : null;
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] flex flex-col md:flex-row overflow-x-hidden">
-      {/* 1. Sleek Black Pill Sidebar (Tampil di Layar Tablet & Desktop >= md) */}
+      {/* 1. Sleek Black Pill Sidebar (Tampil di Desktop >= md) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         alertCount={alerts.length}
       />
 
-      {/* 2. Main Dashboard Content (Diberi pb-24 agar tidak tertutup toolbar di HP) */}
+      {/* 2. Main Dashboard Content (Clean & Full-Width) */}
       <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-24 md:pb-6 overflow-y-auto">
-        {/* Header Bar */}
+        {/* Header Bar yang Bersih dengan Pemilih Pasien Asli dari DB */}
         <Header
           isOnline={isOnline}
           alertCount={alerts.length}
-          patientName="Budi Santoso"
-          roomNumber="ICU Room 03"
+          patients={patients}
+          selectedPatientId={selectedPatientId}
+          onSelectPatient={(id) => setSelectedPatientId(id)}
         />
 
         {/* Top 4 Stat Metric Cards */}
         <StatCards latestMetric={latestMetric} />
 
-        {/* Main Grid: Biometric Chart & Patient Profile */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mb-5 lg:mb-6">
-          {/* Smooth Curved Line Chart (Pure SVG Bezier - 8 cols) */}
-          <div className="lg:col-span-8">
-            <SmoothBiometricChart metrics={metrics} />
-          </div>
-
-          {/* Patient Medical Status Card (4 cols) */}
-          <div className="lg:col-span-4">
-            <PatientProfileCard latestMetric={latestMetric} />
-          </div>
+        {/* Biometric Chart Full-Width (Sangat Bersih & Lega) */}
+        <div className="w-full mb-6">
+          <SmoothBiometricChart metrics={metrics} />
         </div>
 
         {/* Bottom Section: Live Telemetry Stream Feed */}
-        <div className="grid grid-cols-1 gap-6">
+        <div className="w-full">
           <TelemetryFeed metrics={metrics} />
         </div>
       </main>
 
-      {/* 3. Floating Bottom Navigation Bar (Hanya Tampil di Layar HP < md) */}
+      {/* 3. Floating Bottom Navigation Bar (Layar HP < md) */}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}

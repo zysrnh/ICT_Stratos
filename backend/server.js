@@ -145,6 +145,18 @@ app.get('/api/alerts', async (req, res) => {
   }
 });
 
+// -------------------------------------------------------------
+// Endpoint 5: Ambil Daftar Master Pasien (untuk Switcher Pasien)
+// -------------------------------------------------------------
+app.get('/api/patients', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM patients ORDER BY id ASC');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Backend API berjalan di http://localhost:${port}`);
   console.log(`Target database: ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}`);

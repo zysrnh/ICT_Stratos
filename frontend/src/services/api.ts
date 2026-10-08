@@ -1,4 +1,4 @@
-import type { HealthMetric, HealthAlert } from '../types/telemetry';
+import type { HealthMetric, HealthAlert, PatientInfo } from '../types/telemetry';
 
 const API_BASE = 'http://localhost:3000/api';
 
@@ -22,6 +22,18 @@ export async function fetchActiveAlerts(): Promise<HealthAlert[]> {
     return json.data || [];
   } catch (err) {
     console.error('[API Alerts Error]:', err);
+    return [];
+  }
+}
+
+export async function fetchPatients(): Promise<PatientInfo[]> {
+  try {
+    const res = await fetch(`${API_BASE}/patients`);
+    if (!res.ok) throw new Error('Gagal mengambil daftar pasien');
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('[API Patients Error]:', err);
     return [];
   }
 }
