@@ -1,72 +1,52 @@
 import React from 'react';
-import { Radio, ShieldCheck, User } from 'lucide-react';
-import type { PatientInfo } from '../types/telemetry';
+import { Bell, Search } from 'lucide-react';
 
 interface HeaderProps {
-  isOnline: boolean;
   alertCount: number;
-  patients: PatientInfo[];
-  selectedPatientId: number;
-  onSelectPatient: (id: number) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  isOnline,
-  patients,
-  selectedPatientId,
-  onSelectPatient,
-}) => {
+export const Header: React.FC<HeaderProps> = ({ alertCount }) => {
   return (
-    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pt-1">
-      {/* Title & Status */}
+    <header className="flex items-center justify-between gap-4 mb-6 pt-1 select-none">
+      {/* Title & Clean Subtitle */}
       <div>
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-[#111111]">
-            Hello Dr. Josh!
-          </h1>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Radio className={`w-3 h-3 ${isOnline ? 'animate-pulse text-emerald-600' : 'text-neutral-400'}`} />
-            {isOnline ? 'IoT Cloud Connected' : 'Connecting RDS...'}
-          </span>
-        </div>
+        <h1 className="text-2xl lg:text-3xl font-extrabold tracking-tight text-[#111111]">
+          Patient Monitoring
+        </h1>
         <p className="text-xs text-neutral-400 font-medium mt-1">
           Real-time Biometrics & Early Warning System
         </p>
       </div>
 
-      {/* Right Controls: Dynamic Patient Switcher & Doctor Profile */}
-      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-        {/* Dynamic Patient Switcher (Dropdown Rapi & Clean) */}
-        {patients.length > 0 && (
-          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-full border border-neutral-200 shadow-xs">
-            <User className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-            <select
-              value={selectedPatientId}
-              onChange={(e) => onSelectPatient(Number(e.target.value))}
-              aria-label="Pilih Pasien"
-              className="bg-transparent text-xs font-bold text-neutral-800 outline-none cursor-pointer pr-1"
-            >
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name} • {p.room_number}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+      {/* Right Controls: Minimal Search, Alert Bell & Clean Avatar */}
+      <div className="flex items-center gap-3">
+        {/* Search Box (Desktop) */}
+        <div className="relative hidden md:block">
+          <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search metric..."
+            className="pl-10 pr-4 py-2 text-xs bg-white border border-neutral-200 rounded-full w-48 lg:w-56 focus:outline-none focus:ring-2 focus:ring-[#111111] transition-all shadow-xs"
+          />
+        </div>
 
-        {/* Doctor Avatar Profile */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-neutral-200">
-          <div className="w-9 h-9 rounded-full bg-[#111111] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-            DJ
-          </div>
-          <div className="hidden lg:block text-left text-xs">
-            <div className="font-bold text-neutral-900 flex items-center gap-1">
-              Dr. Joshua S.
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            </div>
-            <div className="text-neutral-400 font-medium text-[11px]">Head of Duty</div>
-          </div>
+        {/* Notification Icon */}
+        <button
+          className="relative w-10 h-10 rounded-full bg-white border border-neutral-200 flex items-center justify-center text-neutral-700 hover:bg-neutral-50 transition-colors shadow-xs cursor-pointer"
+          title="Active Alerts"
+        >
+          <Bell className="w-4 h-4" />
+          {alertCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white" />
+          )}
+        </button>
+
+        {/* Minimalist User Avatar */}
+        <div
+          title="Duty Doctor"
+          className="w-10 h-10 rounded-full bg-[#111111] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 cursor-default"
+        >
+          DJ
         </div>
       </div>
     </header>
