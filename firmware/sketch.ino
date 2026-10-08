@@ -27,18 +27,17 @@ const char* password = "";
 String serverUrl = "https://d816-2400-9800-264-2864-8961-1b88-7281-1569.ngrok-free.app/api/telemetry";
 
 // ==========================================
-// Konfigurasi Pin Hardware Smartwatch
+// Konfigurasi Pin Hardware Smart Health Band
 // ==========================================
-#define DHTPIN 32          // Sensor Suhu Kulit DHT22 (Pin Sisi Kiri ESP32)
+#define DHTPIN 32          // Sensor Suhu Kulit DHT22 (Kiri ESP32)
 #define DHTTYPE DHT22
-#define POT_PIN 34         // Sensor Denyut Jantung PPG Potentiometer (Pin Sisi Kiri ESP32)
-#define BTN_SOS 19         // Tombol Crown / SOS Darurat (Pin Sisi Kanan ESP32)
-#define BUZZER_PIN 18      // Haptic Vibration / Alarm Buzzer (Pin Sisi Kanan ESP32)
-#define LED_SYNC 2         // LED Status Sinkronisasi Cloud (Pin Sisi Kiri ESP32)
+#define POT_PIN 34         // Sensor PPG Detak Jantung Potensiometer (Kiri ESP32)
+#define BUZZER_PIN 18      // Alarm Haptic Buzzer (Kanan ESP32)
+#define LED_SYNC 2         // Indikator Sinkronisasi Cloud (Kiri ESP32)
 
 DHT dht(DHTPIN, DHTTYPE);
 
-// Identitas Device & Pengguna
+// Identitas Device & Pasien
 const char* DEVICE_ID = "HUAWEI-WATCH-001";
 const int PATIENT_ID = 1;
 
@@ -47,11 +46,8 @@ unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 3000; // Kirim tiap 3 detik
 unsigned long lastClockTick = 0;
 int clockSeconds = 0;
-int clockMinutes = 35;
+int clockMinutes = 45;
 int clockHours = 17;
-
-// Status Darurat SOS
-bool sosTriggered = false;
 
 // Deklarasi Fungsi
 void updateWatchDisplay(int heartRate, float temperature, String status, bool isAlert);
@@ -59,13 +55,13 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status);
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+  delay(500);
+
   Serial.println("\n=======================================================");
-  Serial.println("   Huawei Smart Health Band (Wearable IoT Prototype)   ");
+  Serial.println("  HUAWEI SMART HEALTH BAND - Real-Time Telemetry IoT   ");
   Serial.println("=======================================================");
 
   // Inisialisasi Pin
-  pinMode(BTN_SOS, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_SYNC, OUTPUT);
   pinMode(POT_PIN, INPUT);
@@ -81,42 +77,43 @@ void setup() {
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
     display.setCursor(18, 15);
-    display.println("HUAWEI WATCH");
-    display.setCursor(15, 35);
-    display.println("Smart Health Band");
-    display.setCursor(20, 50);
-    display.println("Booting System...");
+    display.println("HUAWEI HEALTH");
+    display.setCursor(15, 32);
+    display.println("Early Warning Sys");
+    display.setCursor(20, 48);
+    display.println("Connecting WiFi...");
     display.display();
-    delay(1200);
   }
 
   // Inisialisasi Sensor DHT22
   dht.begin();
 
-  // Koneksi WiFi Wokwi-GUEST
-  Serial.print("[WiFi] Menghubungkan ke ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password, 6);
+  // Koneksi WiFi Wokwi Standard STA Mode
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST");
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
-    delay(400);
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(300);
     Serial.print(".");
     attempts++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WiFi] Sukses terhubung ke Cloud!");
+    Serial.println(" [CONNECTED]");
+    Serial.print("[WiFi] IP Address: ");
+    Serial.println(WiFi.localIP());
     digitalWrite(LED_SYNC, HIGH);
   } else {
-    Serial.println("\n[WiFi] Mode Offline.");
+    Serial.println(" [TIMEOUT - Mode Standalone]");
   }
 }
 
 void loop() {
   unsigned long currentMillis = millis();
 
-  // Update Jam Digital Internal Smartwatch
+  // 1. Update Jam Digital Internal Smartwatch
   if (currentMillis - lastClockTick >= 1000) {
     lastClockTick = currentMillis;
     clockSeconds++;
@@ -130,17 +127,11 @@ void loop() {
     }
   }
 
-  // Deteksi Tombol SOS Darurat pada Jam Tangan
-  if (digitalRead(BTN_SOS) == LOW) {
-    sosTriggered = true;
-    tone(BUZZER_PIN, 2500, 300); // Alarm darurat bunyi
-  }
-
-  // Rutinitas Pembacaan Sensor & Kirim Telemetri
+  // 2. Rutinitas Pembacaan Sensor & Pengiriman Tiap 3 Detik
   if (currentMillis - lastSendTime >= sendInterval) {
     lastSendTime = currentMillis;
 
-    // 1. Baca Sensor Suhu Kulit
+    // Baca Suhu & Kelembaban
     float temperature = dht.readTemperature();
     float humidity = dht.readHumidity();
 
@@ -149,22 +140,18 @@ void loop() {
       humidity = 60.0;
     }
 
-    // 2. Baca Sensor Denyut Jantung Optik (PPG)
+    // Baca Detak Jantung (PPG Simulator Knob: 45 - 150 BPM)
     int rawPot = analogRead(POT_PIN);
     int heartRate = map(rawPot, 0, 4095, 45, 150);
 
-    // 3. Evaluasi Kondisi Medis
+    // 3. Evaluasi Kondisi Medis Otomatis (Early Warning System)
     String healthStatus = "NORMAL";
     bool isAlert = false;
 
-    if (sosTriggered) {
+    if (temperature >= 38.5 || heartRate >= 120 || heartRate <= 48) {
       healthStatus = "CRITICAL";
       isAlert = true;
-      sosTriggered = false; // Reset status SOS setelah terkirim
-    } else if (temperature >= 38.5 || heartRate >= 120 || heartRate <= 48) {
-      healthStatus = "CRITICAL";
-      isAlert = true;
-    } else if (temperature >= 37.6 || heartRate > 100 || heartRate < 60) {
+    } else if (temperature >= 37.5 || heartRate > 100 || heartRate < 60) {
       healthStatus = "WARNING";
       isAlert = true;
     } else {
@@ -172,22 +159,26 @@ void loop() {
       isAlert = false;
     }
 
-    // 4. Efek Haptic / Getar Jam Tangan saat Anomali
+    // 4. Efek Haptic Buzzer (Beep pendek intermiten jika anomali)
     if (isAlert) {
-      tone(BUZZER_PIN, 1800, 150);
+      int alertFreq = (healthStatus == "CRITICAL") ? 2400 : 1400;
+      tone(BUZZER_PIN, alertFreq, 180); // Beep 180ms
     }
 
     // 5. Render Watchface ke Layar OLED
     updateWatchDisplay(heartRate, temperature, healthStatus, isAlert);
 
-    // 6. Cetak ke Serial Monitor
+    // 6. Cetak Ringkasan ke Serial Monitor
     Serial.println("\n-------------------------------------------");
-    Serial.printf("[WATCH] Time: %02d:%02d:%02d\n", clockHours, clockMinutes, clockSeconds);
+    Serial.printf("[TIME] %02d:%02d:%02d | [PATIENT] #%d\n", clockHours, clockMinutes, clockSeconds, PATIENT_ID);
     Serial.printf("[HEART] %d BPM | [TEMP] %.1f C\n", heartRate, temperature);
-    Serial.printf("[STATUS] %s\n", healthStatus.c_str());
+    Serial.printf("[EWS STATUS] %s\n", healthStatus.c_str());
 
-    // 7. Sync Data ke Cloud
-    if (WiFi.status() == WL_CONNECTED) {
+    // 7. Reconnect WiFi jika terputus lalu Kirim Telemetri ke Cloud
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[WiFi] Reconnecting...");
+      WiFi.begin(ssid, password);
+    } else {
       sendTelemetryToCloud(temperature, humidity, heartRate, healthStatus);
     }
   }
@@ -242,7 +233,7 @@ void updateWatchDisplay(int heartRate, float temperature, String status, bool is
     display.printf("! ALERT: %s !", status.c_str());
   } else {
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(22, 53);
+    display.setCursor(20, 53);
     display.print("* STATUS: NORMAL *");
   }
 
@@ -259,7 +250,6 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
   http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("ngrok-skip-browser-warning", "true");
-  http.addHeader("X-Pinggy-No-Screen", "1");
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
@@ -272,15 +262,15 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
   String requestBody;
   serializeJson(doc, requestBody);
 
-  Serial.println("[Cloud] Sync telemetri jam ke server...");
+  Serial.println("[Cloud] Mengirim telemetri ke RDS MySQL...");
   int httpResponseCode = http.POST(requestBody);
 
   if (httpResponseCode > 0) {
     String response = http.getString();
-    Serial.printf("[Cloud Sync OK] HTTP %d: %s\n", httpResponseCode, response.c_str());
+    Serial.printf("[Cloud OK] HTTP %d: %s\n", httpResponseCode, response.c_str());
     digitalWrite(LED_SYNC, HIGH);
   } else {
-    Serial.printf("[Cloud Sync Error] Gagal: %s\n", http.errorToString(httpResponseCode).c_str());
+    Serial.printf("[Cloud Error] Gagal: %s (Code: %d)\n", http.errorToString(httpResponseCode).c_str(), httpResponseCode);
     digitalWrite(LED_SYNC, LOW);
   }
 
