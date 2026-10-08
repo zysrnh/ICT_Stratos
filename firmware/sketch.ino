@@ -28,13 +28,14 @@ String serverUrl = "http://bpfzj-2400-9800-264-2864-8961-1b88-7281-1569.free.pin
 
 // ==========================================
 // Konfigurasi Pin Hardware Smartwatch
+// Disesuaikan agar tata letak kabel rapi & modular
 // ==========================================
-#define DHTPIN 15          // Sensor Suhu Tubuh (DHT22)
+#define DHTPIN 32          // Sensor Suhu Kulit DHT22 (Pin Sisi Kiri ESP32)
 #define DHTTYPE DHT22
-#define POT_PIN 34         // Sensor Denyut Jantung Optik PPG (Simulasi Potensiometer)
-#define BTN_SOS 19         // Tombol Samping Jam (Crown / Tombol SOS Darurat)
-#define BUZZER_PIN 18      // Haptic Vibration / Alarm Buzzer Jam Tangan
-#define LED_SYNC 2         // LED Indikator Cloud Sync
+#define POT_PIN 34         // Sensor Denyut Jantung PPG Potentiometer (Pin Sisi Kiri ESP32)
+#define BTN_SOS 19         // Tombol Crown / SOS Darurat (Pin Sisi Kanan ESP32)
+#define BUZZER_PIN 18      // Haptic Vibration / Alarm Buzzer (Pin Sisi Kanan ESP32)
+#define LED_SYNC 2         // LED Status Sinkronisasi Cloud (Pin Sisi Kanan ESP32)
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -42,12 +43,12 @@ DHT dht(DHTPIN, DHTTYPE);
 const char* DEVICE_ID = "HUAWEI-WATCH-001";
 const int PATIENT_ID = 1;
 
-// Interval Pengiriman & Waktu
+// Interval Pengiriman & Waktu Jam
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 3000; // Kirim tiap 3 detik
 unsigned long lastClockTick = 0;
 int clockSeconds = 0;
-int clockMinutes = 28;
+int clockMinutes = 35;
 int clockHours = 17;
 
 // Status Darurat SOS
@@ -87,7 +88,7 @@ void setup() {
     display.setCursor(20, 50);
     display.println("Booting System...");
     display.display();
-    delay(1500);
+    delay(1200);
   }
 
   // Inisialisasi Sensor DHT22
@@ -109,14 +110,14 @@ void setup() {
     Serial.println("\n[WiFi] Sukses terhubung ke Cloud!");
     digitalWrite(LED_SYNC, HIGH);
   } else {
-    Serial.println("\n[WiFi] Offline mode.");
+    Serial.println("\n[WiFi] Mode Offline.");
   }
 }
 
 void loop() {
   unsigned long currentMillis = millis();
 
-  // Update Jam Digital Internal
+  // Update Jam Digital Internal Smartwatch
   if (currentMillis - lastClockTick >= 1000) {
     lastClockTick = currentMillis;
     clockSeconds++;
@@ -153,14 +154,14 @@ void loop() {
     int rawPot = analogRead(POT_PIN);
     int heartRate = map(rawPot, 0, 4095, 45, 150);
 
-    // 3. Evaluasi Kondisi Kesehatan Pengguna Jam
+    // 3. Evaluasi Kondisi Medis
     String healthStatus = "NORMAL";
     bool isAlert = false;
 
     if (sosTriggered) {
       healthStatus = "CRITICAL";
       isAlert = true;
-      sosTriggered = false; // Reset setelah dikirim
+      sosTriggered = false; // Reset status SOS setelah terkirim
     } else if (temperature >= 38.5 || heartRate >= 120 || heartRate <= 48) {
       healthStatus = "CRITICAL";
       isAlert = true;
@@ -172,12 +173,12 @@ void loop() {
       isAlert = false;
     }
 
-    // 4. Efek Haptic / Buzzer Jam Tangan jika Ada Bahaya
+    // 4. Efek Haptic / Getar Jam Tangan saat Anomali
     if (isAlert) {
-      tone(BUZZER_PIN, 1800, 150); // Getar/bunyi peringatan jam
+      tone(BUZZER_PIN, 1800, 150);
     }
 
-    // 5. Render Tampilan Smartwatch ke Layar OLED
+    // 5. Render Watchface ke Layar OLED
     updateWatchDisplay(heartRate, temperature, healthStatus, isAlert);
 
     // 6. Cetak ke Serial Monitor
@@ -186,7 +187,7 @@ void loop() {
     Serial.printf("[HEART] %d BPM | [TEMP] %.1f C\n", heartRate, temperature);
     Serial.printf("[STATUS] %s\n", healthStatus.c_str());
 
-    // 7. Sync Data ke Huawei Cloud RDS
+    // 7. Sync Data ke Cloud
     if (WiFi.status() == WL_CONNECTED) {
       sendTelemetryToCloud(temperature, humidity, heartRate, healthStatus);
     }
@@ -199,7 +200,7 @@ void loop() {
 void updateWatchDisplay(int heartRate, float temperature, String status, bool isAlert) {
   display.clearDisplay();
 
-  // Header Bar: Logo / Brand + Jam Digital
+  // Header Bar: Brand + Jam Digital
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
@@ -212,7 +213,7 @@ void updateWatchDisplay(int heartRate, float temperature, String status, bool is
 
   display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-  // Widget 1: Denyut Jantung (BPM)
+  // Widget Denyut Jantung (BPM)
   display.setCursor(2, 16);
   display.print("HEART RATE");
 
@@ -224,7 +225,7 @@ void updateWatchDisplay(int heartRate, float temperature, String status, bool is
   display.setCursor(45, 34);
   display.print("BPM");
 
-  // Widget 2: Suhu Tubuh
+  // Widget Suhu Tubuh
   display.setCursor(75, 16);
   display.print("SKIN TEMP");
 
@@ -232,11 +233,10 @@ void updateWatchDisplay(int heartRate, float temperature, String status, bool is
   display.setCursor(75, 29);
   display.printf("%.1f C", temperature);
 
-  // Status Footer Bar
+  // Status Bar Bawah
   display.drawLine(0, 48, 127, 48, SSD1306_WHITE);
 
   if (isAlert) {
-    // Tampilan invert hitam-putih untuk alarm
     display.fillRect(0, 50, 128, 14, SSD1306_WHITE);
     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
     display.setCursor(18, 53);
