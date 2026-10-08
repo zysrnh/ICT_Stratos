@@ -2,11 +2,6 @@
   "version": 1,
   "author": "Huawei ICT Innovation Team",
   "editor": "wokwi",
-  "serialMonitor": {
-    "display": "always",
-    "newline": "lf",
-    "convertEol": false
-  },
   "parts": [
     { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
 
@@ -59,6 +54,9 @@
     }
   ],
   "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
     [ "dht1:VCC", "esp:3V3",   "red",   [ "h20" ] ],
     [ "dht1:GND", "esp:GND.1", "black", [ "h20" ] ],
     [ "dht1:SDA", "esp:32",    "blue",  [ "h20" ] ],

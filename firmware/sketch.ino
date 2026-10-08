@@ -22,9 +22,9 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // ==========================================
-// Konfigurasi Server / Backend API (HTTP Tunnel Ngrok Aktif)
+// Konfigurasi Server / Backend API (HTTP Tunnel Pinggy Aktif)
 // ==========================================
-String serverUrl = "https://d816-2400-9800-264-2864-8961-1b88-7281-1569.ngrok-free.app/api/telemetry";
+String serverUrl = "http://ocmtj-2400-9800-2ad-75f0-8961-1b88-7281-1569.free.pinggy.net/api/telemetry";
 
 // ==========================================
 // Konfigurasi Pin Hardware Smart Health Band
@@ -249,7 +249,7 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
 
   http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("ngrok-skip-browser-warning", "true");
+  http.addHeader("X-Pinggy-No-Screen", "1");
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
