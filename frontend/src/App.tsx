@@ -55,8 +55,8 @@ export const App: React.FC = () => {
         alertCount={alerts.length}
       />
 
-      {/* 2. Main Dashboard Content (Clean & Spacious) */}
-      <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-24 md:pb-6 overflow-y-auto">
+      {/* 2. Main Dashboard Content (Diberi pb-32 agar seluruh konten bawah tuntas tanpa tertutup toolbar) */}
+      <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-32 md:pb-8 overflow-y-auto">
         {/* Header Bar Super Clean & Minimalist */}
         <Header alertCount={alerts.length} />
 

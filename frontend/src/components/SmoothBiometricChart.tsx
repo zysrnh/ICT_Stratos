@@ -16,10 +16,10 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
 
   // Dimensi SVG & Area Gambar
   const width = 640;
-  const height = 250;
+  const height = 260;
   const padLeft = 45;
   const padRight = viewMode === 'combined' ? 45 : 25;
-  const padTop = 35;
+  const padTop = 30;
   const padBottom = 35;
 
   const chartW = width - padLeft - padRight;
@@ -94,13 +94,35 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
   const showHR = viewMode === 'combined' || viewMode === 'heart_rate';
   const showTemp = viewMode === 'combined' || viewMode === 'temperature';
 
+  // Perhitungan Posisi Tooltip Presisi & Responsif
+  let tooltipLeftPct = 50;
+  let tooltipTopPct = 50;
+  let isNearTop = false;
+
+  if (hoveredIndex !== null && chartData[hoveredIndex]) {
+    const ptX = hrPoints[hoveredIndex].x;
+    const ptY =
+      showHR && showTemp
+        ? Math.min(hrPoints[hoveredIndex].y, tempPoints[hoveredIndex].y)
+        : showHR
+        ? hrPoints[hoveredIndex].y
+        : tempPoints[hoveredIndex].y;
+
+    const rawLeft = (ptX / width) * 100;
+    // Clamp horizontal agar tidak terpotong di tepi kiri/kanan HP
+    tooltipLeftPct = Math.max(18, Math.min(82, rawLeft));
+    tooltipTopPct = (ptY / height) * 100;
+    // Jika titik berada di 40% area atas grafik, tampilkan tooltip di BAWAH titik
+    isNearTop = tooltipTopPct < 40;
+  }
+
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-neutral-200/80 shadow-xs flex flex-col justify-between">
-      {/* Header & View Switcher */}
+    <div className="bg-white rounded-3xl p-4 sm:p-6 border border-neutral-200/80 shadow-xs flex flex-col justify-between">
+      {/* Header & View Switcher (Responsif Penuh di Mobile & Desktop) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-extrabold text-[#111111] tracking-tight">Biometric Trend</h2>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h2 className="text-base sm:text-lg font-extrabold text-[#111111] tracking-tight">Biometric Trend</h2>
             {/* Color Legend Indikator */}
             <div className="flex items-center gap-2.5 text-xs font-semibold">
               {showHR && (
@@ -117,24 +139,24 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
               )}
             </div>
           </div>
-          <p className="text-xs text-neutral-400 font-medium mt-0.5">Real-time Stream (Last 20 Data Points)</p>
+          <p className="text-[11px] sm:text-xs text-neutral-400 font-medium mt-0.5">Real-time Stream (Last 20 Data Points)</p>
         </div>
 
-        {/* 3-Way Mode Switcher */}
-        <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-full self-start sm:self-auto select-none">
+        {/* 3-Way Mode Switcher (Full Width di HP) */}
+        <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-full w-full sm:w-auto justify-between sm:justify-start select-none">
           <button
             onClick={() => setViewMode('combined')}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
               viewMode === 'combined'
                 ? 'bg-[#111111] text-white shadow-xs'
                 : 'text-neutral-500 hover:text-neutral-900'
             }`}
           >
-            Combined (Both)
+            Combined
           </button>
           <button
             onClick={() => setViewMode('heart_rate')}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
               viewMode === 'heart_rate'
                 ? 'bg-[#111111] text-white shadow-xs'
                 : 'text-neutral-500 hover:text-neutral-900'
@@ -144,7 +166,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
           </button>
           <button
             onClick={() => setViewMode('temperature')}
-            className={`px-3 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
               viewMode === 'temperature'
                 ? 'bg-[#111111] text-white shadow-xs'
                 : 'text-neutral-500 hover:text-neutral-900'
@@ -156,7 +178,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
       </div>
 
       {/* SVG Multi-Line Chart Canvas */}
-      <div className="relative w-full overflow-hidden select-none">
+      <div className="relative w-full overflow-visible select-none my-1">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-auto overflow-visible"
@@ -269,7 +291,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                 key={`hr-dot-${idx}`}
                 cx={pt.x}
                 cy={pt.y}
-                r={hoveredIndex === idx ? 5.5 : 3.5}
+                r={hoveredIndex === idx ? 6 : 3.5}
                 fill="#111111"
                 stroke="#FFFFFF"
                 strokeWidth={hoveredIndex === idx ? '2.5' : '1.5'}
@@ -286,7 +308,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                 key={`temp-dot-${idx}`}
                 cx={pt.x}
                 cy={pt.y}
-                r={hoveredIndex === idx ? 5.5 : 3.5}
+                r={hoveredIndex === idx ? 6 : 3.5}
                 fill="#E11D48"
                 stroke="#FFFFFF"
                 strokeWidth={hoveredIndex === idx ? '2.5' : '1.5'}
@@ -297,16 +319,18 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
             ))}
         </svg>
 
-        {/* Floating Tooltip Gabungan saat Hover */}
+        {/* Floating Tooltip Gabungan (Auto Flip & Full Percentage Scaling) */}
         {hoveredIndex !== null && chartData[hoveredIndex] && (
           <div
-            className="absolute z-10 px-3.5 py-2 bg-[#111111] text-white text-xs font-bold rounded-2xl shadow-xl pointer-events-none -translate-x-1/2 -translate-y-full mb-3 transition-all border border-neutral-700/60"
+            className={`absolute z-30 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-[#111111] text-white text-xs font-bold rounded-2xl shadow-2xl pointer-events-none -translate-x-1/2 transition-all border border-neutral-700/60 whitespace-nowrap ${
+              isNearTop ? 'translate-y-3' : '-translate-y-full -translate-y-3'
+            }`}
             style={{
-              left: `${(hrPoints[hoveredIndex].x / width) * 100}%`,
-              top: `${Math.min(hrPoints[hoveredIndex].y, tempPoints[hoveredIndex].y)}px`,
+              left: `${tooltipLeftPct}%`,
+              top: `${tooltipTopPct}%`,
             }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               {showHR && (
                 <span className="flex items-center gap-1 text-white">
                   <span className="w-2 h-2 rounded-full bg-white" />
@@ -328,13 +352,13 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
       </div>
 
       {/* Footer Info */}
-      <div className="flex items-center justify-between text-xs text-neutral-400 font-medium mt-3 pt-2.5 border-t border-neutral-100">
-        <span>Oldest recorded</span>
+      <div className="flex items-center justify-between text-[11px] sm:text-xs text-neutral-400 font-medium mt-2 pt-2 border-t border-neutral-100">
+        <span>Oldest</span>
         <span className="flex items-center gap-1.5 text-neutral-800 font-semibold">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live Dual Biometric Stream
+          Live Dual Stream
         </span>
-        <span>Latest recorded</span>
+        <span>Latest</span>
       </div>
     </div>
   );
