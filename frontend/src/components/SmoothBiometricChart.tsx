@@ -118,58 +118,73 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
 
   return (
     <div className="bg-white rounded-3xl p-4 sm:p-6 border border-neutral-200/80 shadow-xs flex flex-col justify-between">
-      {/* Header & View Switcher (Responsif Penuh di Mobile & Desktop) */}
+      {/* Header & View Switcher dengan Animasi Sliding Pill */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <h2 className="text-base sm:text-lg font-extrabold text-[#111111] tracking-tight">Biometric Trend</h2>
             {/* Color Legend Indikator */}
             <div className="flex items-center gap-2.5 text-xs font-semibold">
-              {showHR && (
-                <span className="flex items-center gap-1.5 text-neutral-900">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#111111] ring-1 ring-neutral-300" />
-                  Heart Rate (BPM)
-                </span>
-              )}
-              {showTemp && (
-                <span className="flex items-center gap-1.5 text-rose-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#E11D48] ring-1 ring-rose-200" />
-                  Skin Temp (°C)
-                </span>
-              )}
+              <span
+                className={`flex items-center gap-1.5 transition-all duration-300 ${
+                  showHR ? 'opacity-100 text-neutral-900' : 'opacity-30 text-neutral-400'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-[#111111] ring-1 ring-neutral-300" />
+                Heart Rate (BPM)
+              </span>
+              <span
+                className={`flex items-center gap-1.5 transition-all duration-300 ${
+                  showTemp ? 'opacity-100 text-rose-600' : 'opacity-30 text-neutral-400'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-[#E11D48] ring-1 ring-rose-200" />
+                Skin Temp (°C)
+              </span>
             </div>
           </div>
           <p className="text-[11px] sm:text-xs text-neutral-400 font-medium mt-0.5">Real-time Stream (Last 20 Data Points)</p>
         </div>
 
-        {/* 3-Way Mode Switcher (Full Width di HP) */}
-        <div className="flex items-center gap-1 p-1 bg-neutral-100 rounded-full w-full sm:w-auto justify-between sm:justify-start select-none">
+        {/* 3-Way Mode Switcher dengan Animated Sliding Pill */}
+        <div className="relative flex items-center p-1 bg-neutral-100 rounded-full w-full sm:w-[320px] select-none">
+          {/* Animated Sliding Background Indicator */}
+          <div
+            className="absolute top-1 bottom-1 rounded-full bg-[#111111] shadow-xs transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            style={{
+              width: 'calc((100% - 8px) / 3)',
+              left: '4px',
+              transform: `translateX(${
+                viewMode === 'combined' ? '0%' : viewMode === 'heart_rate' ? '100%' : '200%'
+              })`,
+            }}
+          />
+
+          {/* Button 1: Combined */}
           <button
             onClick={() => setViewMode('combined')}
-            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
-              viewMode === 'combined'
-                ? 'bg-[#111111] text-white shadow-xs'
-                : 'text-neutral-500 hover:text-neutral-900'
+            className={`relative z-10 flex-1 py-1.5 text-center text-xs transition-colors duration-200 cursor-pointer ${
+              viewMode === 'combined' ? 'text-white font-extrabold' : 'text-neutral-500 hover:text-neutral-900 font-medium'
             }`}
           >
             Combined
           </button>
+
+          {/* Button 2: Heart Rate */}
           <button
             onClick={() => setViewMode('heart_rate')}
-            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
-              viewMode === 'heart_rate'
-                ? 'bg-[#111111] text-white shadow-xs'
-                : 'text-neutral-500 hover:text-neutral-900'
+            className={`relative z-10 flex-1 py-1.5 text-center text-xs transition-colors duration-200 cursor-pointer ${
+              viewMode === 'heart_rate' ? 'text-white font-extrabold' : 'text-neutral-500 hover:text-neutral-900 font-medium'
             }`}
           >
             Heart Rate
           </button>
+
+          {/* Button 3: Skin Temp */}
           <button
             onClick={() => setViewMode('temperature')}
-            className={`flex-1 sm:flex-none px-2.5 sm:px-3 py-1 text-center text-xs font-bold rounded-full transition-all cursor-pointer ${
-              viewMode === 'temperature'
-                ? 'bg-[#111111] text-white shadow-xs'
-                : 'text-neutral-500 hover:text-neutral-900'
+            className={`relative z-10 flex-1 py-1.5 text-center text-xs transition-colors duration-200 cursor-pointer ${
+              viewMode === 'temperature' ? 'text-white font-extrabold' : 'text-neutral-500 hover:text-neutral-900 font-medium'
             }`}
           >
             Skin Temp
@@ -177,7 +192,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
         </div>
       </div>
 
-      {/* SVG Multi-Line Chart Canvas */}
+      {/* SVG Multi-Line Chart Canvas dengan Smooth Opacity Fade */}
       <div className="relative w-full overflow-visible select-none my-1">
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -202,9 +217,9 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
             );
           })}
 
-          {/* Left Y-Axis: BPM Labels (Muncul jika showHR) */}
-          {showHR &&
-            hrTicks.map((tick) => {
+          {/* Left Y-Axis: BPM Labels */}
+          <g className={`transition-opacity duration-300 ${showHR ? 'opacity-100' : 'opacity-0'}`}>
+            {hrTicks.map((tick) => {
               const norm = (tick - hrMin) / (hrMax - hrMin);
               const y = padTop + chartH - norm * chartH;
               return (
@@ -221,10 +236,11 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                 </text>
               );
             })}
+          </g>
 
-          {/* Right Y-Axis: Temperature Labels (Muncul di kanan jika Combined / Temp) */}
-          {showTemp &&
-            (viewMode === 'combined'
+          {/* Right Y-Axis: Temperature Labels */}
+          <g className={`transition-opacity duration-300 ${showTemp ? 'opacity-100' : 'opacity-0'}`}>
+            {viewMode === 'combined'
               ? tempTicks.map((tick) => {
                   const norm = (tick - tempMin) / (tempMax - tempMin);
                   const y = padTop + chartH - norm * chartH;
@@ -258,10 +274,11 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                       {tick}°
                     </text>
                   );
-                }))}
+                })}
+          </g>
 
-          {/* 1. Line Path: Heart Rate (Hitam Solid) */}
-          {showHR && hrPoints.length > 1 && (
+          {/* 1. Line Path: Heart Rate (Hitam Solid) dengan Transition Fade */}
+          {hrPoints.length > 1 && (
             <path
               d={hrPath}
               fill="none"
@@ -269,11 +286,12 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className={`transition-opacity duration-300 ${showHR ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             />
           )}
 
-          {/* 2. Line Path: Skin Temperature (Rose Red Solid) */}
-          {showTemp && tempPoints.length > 1 && (
+          {/* 2. Line Path: Skin Temperature (Rose Red Solid) dengan Transition Fade */}
+          {tempPoints.length > 1 && (
             <path
               d={tempPath}
               fill="none"
@@ -281,12 +299,13 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className={`transition-opacity duration-300 ${showTemp ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             />
           )}
 
           {/* Dots: Heart Rate (Hitam) */}
-          {showHR &&
-            hrPoints.map((pt, idx) => (
+          <g className={`transition-opacity duration-300 ${showHR ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            {hrPoints.map((pt, idx) => (
               <circle
                 key={`hr-dot-${idx}`}
                 cx={pt.x}
@@ -300,10 +319,11 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                 onMouseLeave={() => setHoveredIndex(null)}
               />
             ))}
+          </g>
 
           {/* Dots: Temperature (Rose) */}
-          {showTemp &&
-            tempPoints.map((pt, idx) => (
+          <g className={`transition-opacity duration-300 ${showTemp ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            {tempPoints.map((pt, idx) => (
               <circle
                 key={`temp-dot-${idx}`}
                 cx={pt.x}
@@ -317,6 +337,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
                 onMouseLeave={() => setHoveredIndex(null)}
               />
             ))}
+          </g>
         </svg>
 
         {/* Floating Tooltip Gabungan (Auto Flip & Full Percentage Scaling) */}
@@ -339,7 +360,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
               )}
               {showTemp && (
                 <span className="flex items-center gap-1 text-rose-400">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
                   {Number(chartData[hoveredIndex].temperature).toFixed(1)} °C
                 </span>
               )}
