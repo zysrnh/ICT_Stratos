@@ -1,4 +1,6 @@
-# Wokwi Arduino Libraries
+# Wokwi Arduino Libraries for Smart Health Watch
 DHT sensor library
 Adafruit Unified Sensor
 ArduinoJson
+Adafruit SSD1306
+Adafruit GFX Library
