@@ -22,20 +22,19 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // ==========================================
-// Konfigurasi Server / Backend API (HTTP Tunnel Aktif)
+// Konfigurasi Server / Backend API (HTTP Tunnel Ngrok Aktif)
 // ==========================================
-String serverUrl = "http://bpfzj-2400-9800-264-2864-8961-1b88-7281-1569.free.pinggy.net/api/telemetry";
+String serverUrl = "https://d816-2400-9800-264-2864-8961-1b88-7281-1569.ngrok-free.app/api/telemetry";
 
 // ==========================================
 // Konfigurasi Pin Hardware Smartwatch
-// Disesuaikan agar tata letak kabel rapi & modular
 // ==========================================
 #define DHTPIN 32          // Sensor Suhu Kulit DHT22 (Pin Sisi Kiri ESP32)
 #define DHTTYPE DHT22
 #define POT_PIN 34         // Sensor Denyut Jantung PPG Potentiometer (Pin Sisi Kiri ESP32)
 #define BTN_SOS 19         // Tombol Crown / SOS Darurat (Pin Sisi Kanan ESP32)
 #define BUZZER_PIN 18      // Haptic Vibration / Alarm Buzzer (Pin Sisi Kanan ESP32)
-#define LED_SYNC 2         // LED Status Sinkronisasi Cloud (Pin Sisi Kanan ESP32)
+#define LED_SYNC 2         // LED Status Sinkronisasi Cloud (Pin Sisi Kiri ESP32)
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -259,6 +258,7 @@ void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
 
   http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("ngrok-skip-browser-warning", "true");
   http.addHeader("X-Pinggy-No-Screen", "1");
 
   StaticJsonDocument<256> doc;
