@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -22,9 +23,9 @@ const char* ssid = "Wokwi-GUEST";
 const char* password = "";
 
 // ==========================================
-// Konfigurasi Server / Backend API (HTTP Tunnel Pinggy Aktif)
+// Konfigurasi Server / Backend API (Ngrok HTTPS Tunnel Aktif)
 // ==========================================
-String serverUrl = "http://orcsc-2400-9800-2b3-1ca4-e12e-fa59-f29-ef79.free.pinggy.net/api/telemetry";
+String serverUrl = "https://6035-2400-9800-2b3-1ca4-e12e-fa59-f29-ef79.ngrok-free.app/api/telemetry";
 
 // ==========================================
 // Konfigurasi Pin Hardware Smart Health Band
@@ -237,12 +238,13 @@ void updateWatchDisplay(int heartRate, float temperature, String status, bool is
 // Fungsi Kirim Telemetri ke Cloud Backend
 // ==========================================
 void sendTelemetryToCloud(float temp, float hum, int hr, String status) {
-  WiFiClient client;
-  HTTPClient http;
+  WiFiClientSecure client;
+  client.setInsecure(); // Bypass verifikasi sertifikat SSL
 
+  HTTPClient http;
   http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Pinggy-No-Screen", "1");
+  http.addHeader("ngrok-skip-browser-warning", "true");
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = DEVICE_ID;
