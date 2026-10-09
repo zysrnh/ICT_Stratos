@@ -24,7 +24,7 @@ const char* password = "";
 // ==========================================
 // Konfigurasi Server / Backend API (HTTP Tunnel Pinggy Aktif)
 // ==========================================
-String serverUrl = "http://ocmtj-2400-9800-2ad-75f0-8961-1b88-7281-1569.free.pinggy.net/api/telemetry";
+String serverUrl = "http://orcsc-2400-9800-2b3-1ca4-e12e-fa59-f29-ef79.free.pinggy.net/api/telemetry";
 
 // ==========================================
 // Konfigurasi Pin Hardware Smart Health Band
