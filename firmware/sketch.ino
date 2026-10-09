@@ -91,23 +91,17 @@ void setup() {
   // Koneksi WiFi Wokwi Standard STA Mode (Kunci Channel 6 agar instan tanpa scan)
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password, 6);
-  Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST (CH 6)");
+  Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST");
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(400);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(200);
     Serial.print(".");
-    attempts++;
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(" [CONNECTED]");
-    Serial.print("[WiFi] IP Address: ");
-    Serial.println(WiFi.localIP());
-    digitalWrite(LED_SYNC, HIGH);
-  } else {
-    Serial.println(" [TIMEOUT - Menunggu loop reconnect]");
-  }
+  Serial.println(" [CONNECTED]");
+  Serial.print("[WiFi] IP Address: ");
+  Serial.println(WiFi.localIP());
+  digitalWrite(LED_SYNC, HIGH);
 }
 
 void loop() {
@@ -178,14 +172,7 @@ void loop() {
     if (WiFi.status() == WL_CONNECTED) {
       sendTelemetryToCloud(temperature, humidity, heartRate, healthStatus);
     } else {
-      Serial.println("[WiFi] Status: Belum terhubung ke Wokwi-GUEST");
-      static unsigned long lastReconnect = 0;
-      if (millis() - lastReconnect > 10000) {
-        lastReconnect = millis();
-        Serial.println("[WiFi] Reconnecting ke Wokwi-GUEST...");
-        WiFi.disconnect();
-        WiFi.begin(ssid, password, 6);
-      }
+      Serial.println("[WiFi] Status: Terputus dari Wokwi-GUEST...");
     }
   }
 }
