@@ -94,15 +94,21 @@ void setup() {
   WiFi.begin(ssid, password, 6);
   Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST");
 
-  while (WiFi.status() != WL_CONNECTED) {
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 25) {
     delay(200);
     Serial.print(".");
+    attempts++;
   }
 
-  Serial.println(" [CONNECTED]");
-  Serial.print("[WiFi] IP Address: ");
-  Serial.println(WiFi.localIP());
-  digitalWrite(LED_SYNC, HIGH);
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println(" [CONNECTED]");
+    Serial.print("[WiFi] IP Address: ");
+    Serial.println(WiFi.localIP());
+    digitalWrite(LED_SYNC, HIGH);
+  } else {
+    Serial.println(" [OFFLINE - Mode Standalone Smartwatch Aktif]");
+  }
 }
 
 void loop() {
@@ -169,11 +175,11 @@ void loop() {
     Serial.printf("[HEART] %d BPM | [TEMP] %.1f C\n", heartRate, temperature);
     Serial.printf("[EWS STATUS] %s\n", healthStatus.c_str());
 
-    // 7. Cek koneksi WiFi lalu Kirim Telemetri ke Cloud
+    // 7. Cek koneksi WiFi lalu Kirim Telemetri ke Cloud jika terhubung
     if (WiFi.status() == WL_CONNECTED) {
       sendTelemetryToCloud(temperature, humidity, heartRate, healthStatus);
     } else {
-      Serial.println("[WiFi] Status: Terputus dari Wokwi-GUEST...");
+      Serial.println("[Smartwatch] Mode Standalone: Data aktif di layar OLED");
     }
   }
 }
