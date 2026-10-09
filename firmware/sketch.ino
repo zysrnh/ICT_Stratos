@@ -88,14 +88,14 @@ void setup() {
   // Inisialisasi Sensor DHT22
   dht.begin();
 
-  // Koneksi WiFi Wokwi Standard STA Mode
+  // Koneksi WiFi Wokwi Standard STA Mode (Kunci Channel 6 agar instan tanpa scan)
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST");
+  WiFi.begin(ssid, password, 6);
+  Serial.print("[WiFi] Menghubungkan ke Wokwi-GUEST (CH 6)");
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(300);
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(400);
     Serial.print(".");
     attempts++;
   }
@@ -106,7 +106,7 @@ void setup() {
     Serial.println(WiFi.localIP());
     digitalWrite(LED_SYNC, HIGH);
   } else {
-    Serial.println(" [TIMEOUT - Mode Standalone]");
+    Serial.println(" [TIMEOUT - Menunggu loop reconnect]");
   }
 }
 
@@ -174,12 +174,18 @@ void loop() {
     Serial.printf("[HEART] %d BPM | [TEMP] %.1f C\n", heartRate, temperature);
     Serial.printf("[EWS STATUS] %s\n", healthStatus.c_str());
 
-    // 7. Reconnect WiFi jika terputus lalu Kirim Telemetri ke Cloud
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("[WiFi] Reconnecting...");
-      WiFi.begin(ssid, password);
-    } else {
+    // 7. Cek koneksi WiFi lalu Kirim Telemetri ke Cloud
+    if (WiFi.status() == WL_CONNECTED) {
       sendTelemetryToCloud(temperature, humidity, heartRate, healthStatus);
+    } else {
+      Serial.println("[WiFi] Status: Belum terhubung ke Wokwi-GUEST");
+      static unsigned long lastReconnect = 0;
+      if (millis() - lastReconnect > 10000) {
+        lastReconnect = millis();
+        Serial.println("[WiFi] Reconnecting ke Wokwi-GUEST...");
+        WiFi.disconnect();
+        WiFi.begin(ssid, password, 6);
+      }
     }
   }
 }
