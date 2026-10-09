@@ -4,7 +4,8 @@
   "description": "Backend API bridge between ESP32 Wokwi and Huawei Cloud RDS",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "simulate": "node simulator.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
