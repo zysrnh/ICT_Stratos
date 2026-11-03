@@ -46,11 +46,10 @@ const char* WIFI_PASS = "";
 
 // ==========================================
 // Backend
-// USE_HTTPS=0 : Plain HTTP (direkomendasikan untuk stabilitas Wokwi tunnel)
-// USE_HTTPS=1 : TLS (juknis 8.1 mewajibkan enkripsi; di Wokwi setInsecure())
+// USE_HTTPS=1 : TLS Enkripsi Juknis 8.1 (Domain Produksi: ict.hmif-lpkia.my.id)
 // ==========================================
-#define USE_HTTPS 0
-#define API_HOST "ukzpy-112-215-211-109.free.pinggy.net"
+#define USE_HTTPS 1
+#define API_HOST "ict.hmif-lpkia.my.id"
 #if USE_HTTPS
   #define API_BASE "https://" API_HOST
 #else

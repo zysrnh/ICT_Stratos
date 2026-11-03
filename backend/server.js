@@ -1,4 +1,6 @@
 require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -626,6 +628,25 @@ app.post('/api/consent/toggle', async (req, res) => {
     res.status(500).json({ error: 'Gagal mengubah status consent', details: error.message });
   }
 });
+
+// -------------------------------------------------------------
+// Endpoint Penyaji Frontend React (Single Domain Hosting)
+// -------------------------------------------------------------
+const publicDir = fs.existsSync(path.join(__dirname, 'public', 'index.html'))
+  ? path.join(__dirname, 'public')
+  : fs.existsSync(path.join(__dirname, 'dist', 'index.html'))
+  ? path.join(__dirname, 'dist')
+  : null;
+
+if (publicDir) {
+  app.use(express.static(publicDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
+}
 
 // Jalankan Server Express
 app.listen(port, () => {

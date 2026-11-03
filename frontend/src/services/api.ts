@@ -11,7 +11,10 @@ import type {
 } from '../types/telemetry';
 
 export const API_BASE =
-  (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
+  (import.meta.env.VITE_API_URL as string) ||
+  (typeof window !== 'undefined' && window.location.port === '5173'
+    ? 'http://localhost:3000/api'
+    : '/api');
 
 // Helper Token & Session Storage (Anti-Collision di Lingkungan Multi-User / Hosting)
 const STORAGE_KEY = 'eca_auth_session';
