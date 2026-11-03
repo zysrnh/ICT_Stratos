@@ -1,5 +1,12 @@
 import React from 'react';
-import { LayoutDashboard, Activity, Bell, Users, Settings, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ShieldAlert,
+  Bot,
+  Users2,
+  Settings,
+  LogOut,
+} from 'lucide-react';
 
 interface NavProps {
   activeTab: string;
@@ -7,24 +14,24 @@ interface NavProps {
   alertCount: number;
 }
 
-// 1. Sidebar Khusus Layar Tablet & Desktop (Hidden on mobile)
+// 1. Sidebar Khusus Layar Tablet & Desktop (>= md)
 export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCount }) => {
   const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'telemetry', icon: Activity, label: 'Live Telemetry' },
-    { id: 'alerts', icon: Bell, label: 'Alerts', badge: alertCount },
-    { id: 'patients', icon: Users, label: 'Patients' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Pilar 1: Health Monitor' },
+    { id: 'home', icon: ShieldAlert, label: 'Pilar 2: Home Safety & Events', badge: alertCount },
+    { id: 'companion', icon: Bot, label: 'Pilar 3: AI Companion & Reminders' },
+    { id: 'family', icon: Users2, label: 'Pilar 4: Family & UU PDP Consent' },
+    { id: 'settings', icon: Settings, label: 'Pengaturan Sistem' },
   ];
 
   return (
     <aside className="hidden md:flex w-20 lg:w-22 flex-col items-center py-6 px-3 bg-[#111111] text-white rounded-[32px] my-3 ml-3 shadow-xl shrink-0 select-none">
-      {/* Brand Icon / Logo */}
+      {/* Brand Icon / Logo Huawei Health Ecosystem */}
       <div className="mb-8 flex flex-col items-center">
         <div className="w-12 h-12 rounded-2xl bg-white text-[#111111] flex items-center justify-center font-extrabold text-2xl tracking-tighter shadow-md">
           H.
         </div>
-        <span className="text-[9px] font-semibold tracking-wider text-neutral-400 mt-1 uppercase">Health</span>
+        <span className="text-[9px] font-semibold tracking-wider text-neutral-400 mt-1 uppercase">ECA</span>
       </div>
 
       {/* Nav Menu Icons */}
@@ -45,7 +52,7 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCoun
             >
               <Icon className="w-5 h-5 stroke-[2.2]" />
               {item.badge && item.badge > 0 ? (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#DC2626] text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#111111]">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#DC2626] text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#111111] animate-pulse">
                   {item.badge}
                 </span>
               ) : null}
@@ -54,31 +61,31 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCoun
         })}
       </nav>
 
-      {/* Bottom Logout / Exit */}
+      {/* Bottom Profile / Exit */}
       <div className="mt-auto pt-4 border-t border-neutral-800/80 w-full flex justify-center">
         <button
           title="Sign Out"
-          className="w-11 h-11 rounded-2xl text-neutral-400 hover:text-white hover:bg-neutral-800/60 flex items-center justify-center transition-colors cursor-pointer"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800/60 transition-colors cursor-pointer"
         >
-          <LogOut className="w-5 h-5 stroke-[2]" />
+          <LogOut className="w-4 h-4 stroke-[2]" />
         </button>
       </div>
     </aside>
   );
 };
 
-// 2. Floating Bottom Navigation Bar Khusus Layar HP / Mobile
+// 2. Bottom Navigation Bar Khusus Mobile (< md)
 export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCount }) => {
   const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
-    { id: 'telemetry', icon: Activity, label: 'Trend' },
-    { id: 'alerts', icon: Bell, label: 'Alerts', badge: alertCount },
-    { id: 'patients', icon: Users, label: 'Patients' },
-    { id: 'settings', icon: Settings, label: 'Config' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Health' },
+    { id: 'home', icon: ShieldAlert, label: 'Safety', badge: alertCount },
+    { id: 'companion', icon: Bot, label: 'AI' },
+    { id: 'family', icon: Users2, label: 'Family' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-3 inset-x-3 z-50 bg-[#111111]/95 backdrop-blur-md text-white rounded-full py-2 px-3 shadow-2xl border border-neutral-800/80 flex items-center justify-around select-none">
+    <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-[#111111] text-white rounded-3xl p-2.5 shadow-2xl flex items-center justify-around z-50 border border-neutral-800/80">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
@@ -86,16 +93,14 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCo
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-full transition-all cursor-pointer ${
-              isActive
-                ? 'bg-white text-[#111111] font-bold shadow-sm'
-                : 'text-neutral-400 hover:text-white'
+            className={`relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-all duration-200 cursor-pointer ${
+              isActive ? 'bg-white text-[#111111] font-semibold' : 'text-neutral-400 hover:text-white'
             }`}
           >
             <Icon className="w-5 h-5 stroke-[2.2]" />
-            <span className="text-[10px] font-semibold mt-0.5">{item.label}</span>
+            <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
             {item.badge && item.badge > 0 ? (
-              <span className="absolute -top-1 -right-0.5 w-4 h-4 bg-[#DC2626] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-[#111111]">
+              <span className="absolute -top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#111111] animate-pulse">
                 {item.badge}
               </span>
             ) : null}

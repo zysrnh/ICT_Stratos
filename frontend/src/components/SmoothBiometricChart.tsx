@@ -33,7 +33,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
 
   // Hitung Titik Koordinat Heart Rate
   const hrPoints = chartData.map((d, index) => {
-    const val = d.heart_rate;
+    const val = d.heart_rate ?? 70;
     const x = padLeft + (index / Math.max(chartData.length - 1, 1)) * chartW;
     const norm = (val - hrMin) / (hrMax - hrMin);
     const clamped = Math.max(0, Math.min(1, norm));
@@ -48,7 +48,7 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
 
   // Hitung Titik Koordinat Temperature
   const tempPoints = chartData.map((d, index) => {
-    const val = Number(d.temperature);
+    const val = Number(d.temperature ?? d.room_temp ?? 36.6);
     const x = padLeft + (index / Math.max(chartData.length - 1, 1)) * chartW;
     const norm = (val - tempMin) / (tempMax - tempMin);
     const clamped = Math.max(0, Math.min(1, norm));
