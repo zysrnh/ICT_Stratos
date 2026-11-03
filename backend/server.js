@@ -26,6 +26,250 @@ const pool = mysql.createPool({
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 });
 
+// -------------------------------------------------------------
+// Auto-Migration & Schema Verification (Bebas phpMyAdmin / cPanel Friendly)
+// -------------------------------------------------------------
+async function runAutoMigrations() {
+  console.log('[AutoMigration] Memeriksa dan memigrasi struktur tabel database...');
+  try {
+    // 1. users
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) NOT NULL UNIQUE,
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        full_name VARCHAR(100) NOT NULL,
+        role ENUM('FAMILY_PRIMARY', 'FAMILY_SECONDARY', 'DOCTOR', 'ADMIN') DEFAULT 'FAMILY_PRIMARY',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 2. patients
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS patients (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_code VARCHAR(50) NOT NULL UNIQUE,
+        full_name VARCHAR(100) NOT NULL,
+        age INT NOT NULL,
+        gender ENUM('MALE', 'FEMALE') NOT NULL,
+        room_number VARCHAR(30) DEFAULT NULL,
+        condition_summary TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 3. devices
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id VARCHAR(50) PRIMARY KEY,
+        patient_id INT NOT NULL,
+        device_token VARCHAR(100) DEFAULT 'HUAWEI-ECA-8821',
+        device_type ENUM('watch', 'home', 'companion') NOT NULL,
+        model_name VARCHAR(50) NOT NULL,
+        status ENUM('ONLINE', 'OFFLINE') DEFAULT 'ONLINE',
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_dev_patient (patient_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 4. health_metrics
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS health_metrics (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        device_id VARCHAR(50) NOT NULL,
+        device_type ENUM('watch', 'home') DEFAULT 'watch',
+        heart_rate INT DEFAULT NULL,
+        activity VARCHAR(20) DEFAULT 'REST',
+        steps INT DEFAULT 0,
+        accel_g DECIMAL(4, 2) DEFAULT 1.00,
+        health_status ENUM('NORMAL', 'WARNING', 'CRITICAL') DEFAULT 'NORMAL',
+        fall_cancelled INT DEFAULT 0,
+        temperature DECIMAL(4, 2) DEFAULT NULL,
+        room_temp DECIMAL(4, 2) DEFAULT NULL,
+        humidity DECIMAL(4, 2) DEFAULT NULL,
+        smoke_adc INT DEFAULT NULL,
+        smoke_status VARCHAR(20) DEFAULT 'NORMAL',
+        sim BOOLEAN DEFAULT FALSE,
+        wifi_rssi INT DEFAULT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_patient_time (patient_id, recorded_at),
+        INDEX idx_device_type (device_type),
+        INDEX idx_status (health_status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 5. emergency_events
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS emergency_events (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        event_id VARCHAR(50) NOT NULL UNIQUE,
+        patient_id INT NOT NULL,
+        device_id VARCHAR(50) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        severity ENUM('WARNING', 'CRITICAL') NOT NULL,
+        status ENUM('PENDING', 'ESCALATED', 'CANCELLED', 'RESOLVED') DEFAULT 'PENDING',
+        value DECIMAL(6, 2) DEFAULT 0.00,
+        sim BOOLEAN DEFAULT FALSE,
+        escalation_level INT DEFAULT 1,
+        escalated_to VARCHAR(150) DEFAULT NULL,
+        notes TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_event_patient (patient_id, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 6. health_alerts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS health_alerts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        metric_id BIGINT NULL DEFAULT NULL,
+        patient_id INT NOT NULL,
+        alert_type VARCHAR(50) NOT NULL,
+        severity ENUM('WARNING', 'CRITICAL') NOT NULL,
+        message TEXT NOT NULL,
+        is_resolved BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_alert_patient (patient_id, is_resolved)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 7. emergency_contacts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        relationship VARCHAR(50) NOT NULL,
+        phone_number VARCHAR(30) NOT NULL,
+        priority_order INT NOT NULL DEFAULT 1,
+        is_primary BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_contact_patient (patient_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 8. reminders
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reminders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        reminder_type ENUM('MEDICINE', 'ACTIVITY', 'CHECKIN') NOT NULL,
+        title VARCHAR(150) NOT NULL,
+        time_scheduled VARCHAR(10) NOT NULL,
+        is_confirmed BOOLEAN DEFAULT FALSE,
+        confirmed_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_reminder_patient (patient_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 9. consents
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        data_type VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        is_granted BOOLEAN DEFAULT TRUE,
+        granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_consent_patient (patient_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // 10. conversation_logs
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_logs (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        sender ENUM('ELDER', 'AI') NOT NULL,
+        message TEXT NOT NULL,
+        sentiment VARCHAR(30) DEFAULT 'NEUTRAL',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_chat_patient (patient_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Seed Data Demo
+    await pool.query(`
+      INSERT INTO users (id, username, email, password, full_name, role)
+      VALUES (1, 'rully', 'rully@familycare.id', 'demo123', 'Rully Santoso (Keluarga Utama)', 'FAMILY_PRIMARY')
+      ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
+    `);
+
+    await pool.query(`
+      INSERT INTO patients (id, patient_code, full_name, age, gender, room_number, condition_summary)
+      VALUES 
+      (1, 'ELD-001', 'Opa Budi Santoso', 71, 'MALE', 'Kamar Utama (Lantai 1)', 'Hipertensi terkontrol Amlodipine 5mg. Riwayat pusing saat bangun tidur'),
+      (2, 'ELD-002', 'Oma Siti Rahma', 68, 'FEMALE', 'Paviliun Melati', 'Kondisi stabil, rutin konsumsi vitamin & obat jantung')
+      ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
+    `);
+
+    await pool.query(`
+      INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+      VALUES
+      ('HUAWEI-WATCH-001', 1, 'HUAWEI-ECA-8821', 'watch', 'Huawei Smart Health Band Pro', 'ONLINE'),
+      ('ECA-HOME-001', 1, 'HUAWEI-ECA-8821', 'home', 'Huawei Smart Home Safety Node', 'ONLINE')
+      ON DUPLICATE KEY UPDATE device_token = VALUES(device_token);
+    `);
+
+    await pool.query(`
+      INSERT INTO emergency_contacts (id, patient_id, name, relationship, phone_number, priority_order, is_primary)
+      VALUES
+      (1, 1, 'Rully Santoso', 'Anak Pertama (Wali Utama)', '+62 812-3456-7890', 1, TRUE),
+      (2, 1, 'Dr. Sarah Sp.PD', 'Dokter Keluarga', '+62 811-9876-5432', 2, FALSE),
+      (3, 1, 'Call Center Ambulans 118', 'Layanan Darurat Medis', '118', 3, FALSE)
+      ON DUPLICATE KEY UPDATE name = VALUES(name);
+    `);
+
+    await pool.query(`
+      INSERT INTO reminders (id, patient_id, reminder_type, title, time_scheduled, is_confirmed)
+      VALUES
+      (1, 1, 'MEDICINE', 'Minum Obat Amlodipine 5mg (Hipertensi)', '07:30', TRUE),
+      (2, 1, 'ACTIVITY', 'Jalan Kaki Ringan di Halaman', '08:00', TRUE),
+      (3, 1, 'MEDICINE', 'Minum Multivitamin Geriatri', '12:30', FALSE),
+      (4, 1, 'CHECKIN', 'Istirahat Siang & Cek Hidrasi Air Putih', '13:00', FALSE),
+      (5, 1, 'MEDICINE', 'Suplemen Sendi Glukosamin', '19:00', FALSE)
+      ON DUPLICATE KEY UPDATE title = VALUES(title);
+    `);
+
+    await pool.query(`
+      INSERT INTO consents (id, patient_id, data_type, description, is_granted)
+      VALUES
+      (1, 1, 'Biometrik Detak Jantung & PPG', 'Data detak jantung untuk deteksi aritmia dan kelelahan.', TRUE),
+      (2, 1, 'Akselerometer & Deteksi Jatuh', 'Data percepatan gerak untuk deteksi impak benturan jatuh.', TRUE),
+      (3, 1, 'Deteksi Asap & Suhu Lingkungan', 'Data keselamatan fisik rumah dari kebakaran dan suhu ekstrem.', TRUE),
+      (4, 1, 'Transkrip AI Pendampingan', 'Riwayat interaksi suara dan percakapan untuk analisis emosi.', TRUE)
+      ON DUPLICATE KEY UPDATE description = VALUES(description);
+    `);
+
+    await pool.query(`
+      INSERT INTO conversation_logs (id, patient_id, sender, message, sentiment)
+      VALUES
+      (1, 1, 'AI', 'Selamat pagi Opa Budi! Bagaimana perasaan Opa hari ini? Jangan lupa sarapan dan minum obatnya ya.', 'CALM'),
+      (2, 1, 'ELDER', 'Pagi Nak. Tadi agak pusing sedikit pas bangun, tapi sekarang sudah enakan setelah minum air.', 'CALM'),
+      (3, 1, 'AI', 'Syukurlah kalau sudah enakan Opa. Jangan langsung berdiri cepat-cepat ya Opa. Jadwal jalan santai jam 08:00 nanti santai saja.', 'HAPPY')
+      ON DUPLICATE KEY UPDATE message = VALUES(message);
+    `);
+
+    console.log('[AutoMigration] Sukses! Semua 10 tabel & seed data terverifikasi.');
+    return { success: true, message: 'Semua 10 tabel dan data awal berhasil dimigrasi.' };
+  } catch (err) {
+    console.error('[AutoMigration Error]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// Endpoint Trigger Migrasi Manual
+app.get('/api/system/migrate', async (req, res) => {
+  const result = await runAutoMigrations();
+  res.json(result);
+});
+
 // Middleware Autentikasi Token (Juknis 8.1 & Anti-Collision)
 const verifyDeviceOrAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -655,4 +899,5 @@ app.listen(port, () => {
   console.log(`  Server aktif di http://localhost:${port}                    `);
   console.log(`  Autentikasi Token & Pairing Device Aktif (Anti-Collision)   `);
   console.log(`=============================================================`);
+  runAutoMigrations();
 });

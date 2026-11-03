@@ -50,3 +50,4 @@ fs.rmSync(tempDir, { recursive: true, force: true });
 
 const stats = fs.statSync(zipFile);
 console.log(`Success! Created ${zipFile} (${(stats.size / 1024).toFixed(1)} KB)`);
+
