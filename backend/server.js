@@ -878,6 +878,8 @@ app.post('/api/consent/toggle', async (req, res) => {
 // -------------------------------------------------------------
 const publicDir = fs.existsSync(path.join(__dirname, 'public', 'index.html'))
   ? path.join(__dirname, 'public')
+  : fs.existsSync(path.join(__dirname, '..', 'public', 'index.html'))
+  ? path.join(__dirname, '..', 'public')
   : fs.existsSync(path.join(__dirname, 'dist', 'index.html'))
   ? path.join(__dirname, 'dist')
   : null;
