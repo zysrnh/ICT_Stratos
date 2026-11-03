@@ -29,7 +29,7 @@ function sendPost(path, payload, label) {
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(data),
-      'Authorization': 'Bearer HUAWEI_ECA_TOKEN_2026'
+      'Authorization': 'Bearer HUAWEI-ECA-8821'
     }
   };
 

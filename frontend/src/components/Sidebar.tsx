@@ -5,17 +5,23 @@ import {
   Bot,
   Users2,
   Settings,
-  LogOut,
+  KeyRound,
 } from 'lucide-react';
 
 interface NavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   alertCount: number;
+  onOpenAuth?: () => void;
 }
 
 // 1. Sidebar Khusus Layar Tablet & Desktop (>= md)
-export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCount }) => {
+export const Sidebar: React.FC<NavProps> = ({
+  activeTab,
+  setActiveTab,
+  alertCount,
+  onOpenAuth,
+}) => {
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Pilar 1: Health Monitor' },
     { id: 'home', icon: ShieldAlert, label: 'Pilar 2: Home Safety & Events', badge: alertCount },
@@ -61,13 +67,14 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCoun
         })}
       </nav>
 
-      {/* Bottom Profile / Exit */}
+      {/* Bottom Profile / Pairing Token Access */}
       <div className="mt-auto pt-4 border-t border-neutral-800/80 w-full flex justify-center">
         <button
-          title="Sign Out"
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800/60 transition-colors cursor-pointer"
+          onClick={onOpenAuth}
+          title="Pairing Perangkat & Kelola Token ID Jam"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-800/60 transition-colors cursor-pointer"
         >
-          <LogOut className="w-4 h-4 stroke-[2]" />
+          <KeyRound className="w-4 h-4 stroke-[2]" />
         </button>
       </div>
     </aside>
@@ -75,7 +82,12 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCoun
 };
 
 // 2. Bottom Navigation Bar Khusus Mobile (< md)
-export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCount }) => {
+export const BottomNav: React.FC<NavProps> = ({
+  activeTab,
+  setActiveTab,
+  alertCount,
+  onOpenAuth,
+}) => {
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Health' },
     { id: 'home', icon: ShieldAlert, label: 'Safety', badge: alertCount },
@@ -107,6 +119,16 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, alertCo
           </button>
         );
       })}
+
+      {/* Tombol Pairing Mobile */}
+      <button
+        onClick={onOpenAuth}
+        title="Pairing ID Jam Tangan"
+        className="flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-neutral-400 hover:text-white transition-all cursor-pointer"
+      >
+        <KeyRound className="w-5 h-5 stroke-[2.2]" />
+        <span className="text-[10px] mt-0.5 tracking-tight">Token</span>
+      </button>
     </nav>
   );
 };

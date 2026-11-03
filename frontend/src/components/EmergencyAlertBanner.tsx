@@ -106,3 +106,4 @@ export const EmergencyAlertBanner: React.FC<AlertBannerProps> = ({
     </div>
   );
 };
+

@@ -7,13 +7,149 @@ import type {
   ReminderItem,
   ConsentItem,
   ConversationMessage,
+  AuthSession,
 } from '../types/telemetry';
 
-const API_BASE = 'http://localhost:3000/api';
+export const API_BASE =
+  (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
 
-export async function fetchLatestTelemetry(patientId = 1): Promise<HealthMetric[]> {
+// Helper Token & Session Storage (Anti-Collision di Lingkungan Multi-User / Hosting)
+const STORAGE_KEY = 'eca_auth_session';
+
+export function getSavedSession(): AuthSession | null {
   try {
-    const res = await fetch(`${API_BASE}/telemetry/latest?patient_id=${patientId}`);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AuthSession;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSession(session: AuthSession): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+}
+
+export function clearSession(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function getAuthHeaders(): HeadersInit {
+  const session = getSavedSession();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (session?.token) {
+    headers['Authorization'] = `Bearer ${session.token}`;
+    headers['x-device-token'] = session.token;
+  }
+  return headers;
+}
+
+// -------------------------------------------------------------
+// Autentikasi Keluarga, Pairing Token & Pendaftaran ID Jam
+// -------------------------------------------------------------
+export async function loginAuth(params: {
+  username?: string;
+  password?: string;
+  token?: string;
+}): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Autentikasi gagal. Periksa token atau kredensial.');
+  }
+
+  saveSession(json);
+  return json as AuthSession;
+}
+
+export async function pairDevice(token: string): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/auth/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token.trim() }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Pairing token tidak valid.');
+  }
+
+  const session: AuthSession = {
+    token: token.trim(),
+    auth_type: 'DEVICE_TOKEN',
+    user: {
+      id: 1,
+      full_name: `Keluarga (${json.patient_name || 'Pasien'})`,
+      role: 'FAMILY_PRIMARY',
+    },
+    paired_device: json.device,
+    patient_id: json.patient_id,
+    patient_name: json.patient_name || 'Lansia Terdaftar',
+  };
+
+  saveSession(session);
+  return session;
+}
+
+export async function registerDevice(params: {
+  device_token: string;
+  patient_name: string;
+  room_number?: string;
+  age?: number;
+}): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/auth/register-device`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Pendaftaran perangkat gagal.');
+  }
+
+  const session: AuthSession = {
+    token: json.token,
+    auth_type: 'DEVICE_TOKEN',
+    user: {
+      id: 1,
+      full_name: `Keluarga (${json.patient_name})`,
+      role: 'FAMILY_PRIMARY',
+    },
+    paired_device: {
+      id: json.devices[0],
+      patient_id: json.patient_id,
+      device_token: json.token,
+      device_type: 'watch',
+      model_name: 'Huawei Smart Health Band Pro',
+      status: 'ONLINE',
+      patient_name: json.patient_name,
+    },
+    patient_id: json.patient_id,
+    patient_name: json.patient_name,
+  };
+
+  saveSession(session);
+  return session;
+}
+
+// -------------------------------------------------------------
+// Data Telemetri & Layanan Lansia
+// -------------------------------------------------------------
+export async function fetchLatestTelemetry(patientId?: number): Promise<HealthMetric[]> {
+  try {
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/telemetry/latest?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil data telemetri');
     const json = await res.json();
     return json.data || [];
@@ -23,9 +159,13 @@ export async function fetchLatestTelemetry(patientId = 1): Promise<HealthMetric[
   }
 }
 
-export async function fetchEmergencyEvents(patientId = 1): Promise<EmergencyEvent[]> {
+export async function fetchEmergencyEvents(patientId?: number): Promise<EmergencyEvent[]> {
   try {
-    const res = await fetch(`${API_BASE}/events?patient_id=${patientId}`);
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/events?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil events darurat');
     const json = await res.json();
     return json.data || [];
@@ -37,7 +177,9 @@ export async function fetchEmergencyEvents(patientId = 1): Promise<EmergencyEven
 
 export async function fetchActiveAlerts(): Promise<HealthAlert[]> {
   try {
-    const res = await fetch(`${API_BASE}/alerts`);
+    const res = await fetch(`${API_BASE}/alerts`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil alerts');
     const json = await res.json();
     return json.data || [];
@@ -49,7 +191,9 @@ export async function fetchActiveAlerts(): Promise<HealthAlert[]> {
 
 export async function fetchPatients(): Promise<PatientInfo[]> {
   try {
-    const res = await fetch(`${API_BASE}/patients`);
+    const res = await fetch(`${API_BASE}/patients`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil daftar pasien');
     const json = await res.json();
     return json.data || [];
@@ -59,9 +203,13 @@ export async function fetchPatients(): Promise<PatientInfo[]> {
   }
 }
 
-export async function fetchEmergencyContacts(patientId = 1): Promise<EmergencyContact[]> {
+export async function fetchEmergencyContacts(patientId?: number): Promise<EmergencyContact[]> {
   try {
-    const res = await fetch(`${API_BASE}/contacts?patient_id=${patientId}`);
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/contacts?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil kontak darurat');
     const json = await res.json();
     return json.data || [];
@@ -71,9 +219,13 @@ export async function fetchEmergencyContacts(patientId = 1): Promise<EmergencyCo
   }
 }
 
-export async function fetchReminders(patientId = 1): Promise<ReminderItem[]> {
+export async function fetchReminders(patientId?: number): Promise<ReminderItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/reminders?patient_id=${patientId}`);
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/reminders?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil pengingat obat');
     const json = await res.json();
     return json.data || [];
@@ -87,7 +239,7 @@ export async function toggleReminder(reminderId: number, isConfirmed: boolean): 
   try {
     const res = await fetch(`${API_BASE}/reminders/toggle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ reminder_id: reminderId, is_confirmed: isConfirmed }),
     });
     return res.ok;
@@ -97,9 +249,13 @@ export async function toggleReminder(reminderId: number, isConfirmed: boolean): 
   }
 }
 
-export async function fetchCompanionChat(patientId = 1): Promise<ConversationMessage[]> {
+export async function fetchCompanionChat(patientId?: number): Promise<ConversationMessage[]> {
   try {
-    const res = await fetch(`${API_BASE}/companion/chat?patient_id=${patientId}`);
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/companion/chat?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil percakapan AI');
     const json = await res.json();
     return json.data || [];
@@ -113,7 +269,7 @@ export async function sendCompanionMessage(patientId: number, message: string): 
   try {
     const res = await fetch(`${API_BASE}/companion/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ patient_id: patientId, message }),
     });
     if (!res.ok) throw new Error('Gagal mengirim pesan ke AI');
@@ -125,9 +281,13 @@ export async function sendCompanionMessage(patientId: number, message: string): 
   }
 }
 
-export async function fetchConsents(patientId = 1): Promise<ConsentItem[]> {
+export async function fetchConsents(patientId?: number): Promise<ConsentItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/consent?patient_id=${patientId}`);
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/consent?patient_id=${pid}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error('Gagal mengambil data consent');
     const json = await res.json();
     return json.data || [];
@@ -141,7 +301,7 @@ export async function toggleConsent(consentId: number, isGranted: boolean): Prom
   try {
     const res = await fetch(`${API_BASE}/consent/toggle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ consent_id: consentId, is_granted: isGranted }),
     });
     return res.ok;
@@ -158,14 +318,15 @@ export async function triggerSimulatedEvent(
   value = 3.2
 ): Promise<boolean> {
   try {
+    const session = getSavedSession();
     const eventId = `SIM-${eventType}-${Date.now().toString().slice(-4)}`;
     const res = await fetch(`${API_BASE}/events`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         event_id: eventId,
         device_id: eventType === 'SMOKE' ? 'ECA-HOME-001' : 'HUAWEI-WATCH-001',
-        patient_id: 1,
+        patient_id: session?.patient_id ?? 1,
         event_type: eventType,
         severity: 'CRITICAL',
         status: status,

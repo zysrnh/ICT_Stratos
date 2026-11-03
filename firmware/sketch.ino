@@ -58,7 +58,7 @@ const char* WIFI_PASS = "";
 #endif
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
-const char* API_KEY       = "HUAWEI_ECA_TOKEN_2026";   // backend memvalidasi (Authorization: Bearer ...)
+const char* API_KEY       = "HUAWEI-ECA-8821";   // Token ID Perangkat (Anti-Collision: ganti sesuai token di web jika buat ID baru)
 
 // ==========================================
 // Identitas

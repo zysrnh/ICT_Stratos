@@ -2,7 +2,7 @@
 -- Database Schema: Huawei Cloud RDS (MySQL 8.0)
 -- Project: AI-Powered Elderly Care Ecosystem (ECA)
 -- Track: Huawei ICT Competition - Innovation Track
--- Sesuai Dokumen JUKNIS Versi 1.0 (4 Pilar Produk)
+-- Sesuai Dokumen JUKNIS Versi 1.0 (4 Pilar Produk + Autentikasi Token)
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS `huawei_health_iot`
@@ -12,7 +12,20 @@ CREATE DATABASE IF NOT EXISTS `huawei_health_iot`
 USE `huawei_health_iot`;
 
 -- ---------------------------------------------------------------------
--- 1. Tabel Profil Lansia / Pasien (Master Data - Juknis 5.2)
+-- 1. Tabel Akun Pengguna / Keluarga (Juknis 5.1 & 8.1)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `username` VARCHAR(50) NOT NULL UNIQUE,
+    `email` VARCHAR(100) NOT NULL UNIQUE,
+    `password` VARCHAR(255) NOT NULL,
+    `full_name` VARCHAR(100) NOT NULL,
+    `role` ENUM('FAMILY_PRIMARY', 'FAMILY_SECONDARY', 'DOCTOR', 'ADMIN') DEFAULT 'FAMILY_PRIMARY',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------
+-- 2. Tabel Profil Lansia / Pasien (Master Data - Juknis 5.2)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `patients` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,11 +40,12 @@ CREATE TABLE IF NOT EXISTS `patients` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 2. Tabel Perangkat Terdaftar (Device Management - Juknis 5.2)
+-- 3. Tabel Perangkat Terdaftar & Token Pairing (Device Token Security)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `devices` (
     `id` VARCHAR(50) PRIMARY KEY,
     `patient_id` INT NOT NULL,
+    `device_token` VARCHAR(100) DEFAULT 'HUAWEI-ECA-8821' COMMENT 'Token otentikasi unik perangkat',
     `device_type` ENUM('watch', 'home', 'companion') NOT NULL,
     `model_name` VARCHAR(50) NOT NULL,
     `status` ENUM('ONLINE', 'OFFLINE') DEFAULT 'ONLINE',
@@ -40,7 +54,7 @@ CREATE TABLE IF NOT EXISTS `devices` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 3. Tabel Telemetri Sensor Deret Waktu (Dual-Device: Watch & Home)
+-- 4. Tabel Telemetri Sensor Deret Waktu (Dual-Device: Watch & Home)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `health_metrics` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -75,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `health_metrics` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 4. Tabel Kejadian Darurat & Siklus Eskalasi (Juknis Bagian 6)
+-- 5. Tabel Kejadian Darurat & Siklus Eskalasi (Juknis Bagian 6)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `emergency_events` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -98,7 +112,7 @@ CREATE TABLE IF NOT EXISTS `emergency_events` (
     CONSTRAINT `fk_event_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Tabel Legacy Health Alerts (kompatibilitas query lama)
+-- Tabel Legacy Health Alerts (kompatibilitas)
 CREATE TABLE IF NOT EXISTS `health_alerts` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `metric_id` BIGINT DEFAULT NULL,
@@ -114,29 +128,29 @@ CREATE TABLE IF NOT EXISTS `health_alerts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 5. Tabel Kontak Darurat Bertingkat (Juknis 2.4 & 6.1)
+-- 6. Tabel Kontak Darurat Bertingkat (Juknis 2.4 & 6.1)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `emergency_contacts` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `patient_id` INT NOT NULL,
     `name` VARCHAR(100) NOT NULL,
-    `relationship` VARCHAR(50) NOT NULL COMMENT 'Anak Pertama, Pasangan, Dokter Keluarga, RS',
+    `relationship` VARCHAR(50) NOT NULL,
     `phone_number` VARCHAR(30) NOT NULL,
-    `priority_order` INT NOT NULL DEFAULT 1 COMMENT 'Urutan eskalasi 1, 2, 3',
+    `priority_order` INT NOT NULL DEFAULT 1,
     `is_primary` BOOLEAN DEFAULT FALSE,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `fk_contact_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 6. Tabel Pengingat Obat & Aktivitas (Pilar 3: AI Companion - Juknis 5.4)
+-- 7. Tabel Pengingat Obat & Aktivitas (Pilar 3: AI Companion - Juknis 5.4)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `reminders` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `patient_id` INT NOT NULL,
     `reminder_type` ENUM('MEDICINE', 'ACTIVITY', 'CHECKIN') NOT NULL,
     `title` VARCHAR(150) NOT NULL,
-    `time_scheduled` VARCHAR(10) NOT NULL COMMENT 'HH:mm (misal 08:00)',
+    `time_scheduled` VARCHAR(10) NOT NULL,
     `is_confirmed` BOOLEAN DEFAULT FALSE,
     `confirmed_at` TIMESTAMP NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -144,12 +158,12 @@ CREATE TABLE IF NOT EXISTS `reminders` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 7. Tabel Persetujuan Privasi & Consent (Juknis 8: Kepatuhan UU PDP)
+-- 8. Tabel Persetujuan Privasi & Consent (Juknis 8: Kepatuhan UU PDP)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `consents` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `patient_id` INT NOT NULL,
-    `data_type` VARCHAR(100) NOT NULL COMMENT 'Biometrik Kesehatan, Lokasi, Deteksi Jatuh, AI Chat',
+    `data_type` VARCHAR(100) NOT NULL,
     `description` TEXT NOT NULL,
     `is_granted` BOOLEAN DEFAULT TRUE,
     `granted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -158,32 +172,37 @@ CREATE TABLE IF NOT EXISTS `consents` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- 8. Tabel Log Percakapan AI Companion (Pilar 3 - Juknis 5.4)
+-- 9. Tabel Log Percakapan AI Companion (Pilar 3 - Juknis 5.4)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `conversation_logs` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `patient_id` INT NOT NULL,
     `sender` ENUM('ELDER', 'AI') NOT NULL,
     `message` TEXT NOT NULL,
-    `sentiment` VARCHAR(30) DEFAULT 'NEUTRAL' COMMENT 'HAPPY, CALM, ANXIOUS, TIRED',
+    `sentiment` VARCHAR(30) DEFAULT 'NEUTRAL',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT `fk_chat_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- Seed Data Awal Sesuai Skenario Demo Juri
+-- Seed Data Awal
 -- ---------------------------------------------------------------------
-INSERT INTO `patients` (`id`, `patient_code`, `full_name`, `age`, `gender`, `room_number`, `condition_summary`)
-VALUES 
-(1, 'ELD-001', 'Opa Budi Santoso', 71, 'MALE', 'Kamar Utama (Lantai 1)', 'Hipertensi ringan, riwayat pusing saat bangun tidur'),
-(2, 'ELD-002', 'Oma Siti Rahma', 68, 'FEMALE', 'Paviliun Melati', 'Kondisi stabil, rutin konsumsi obat jantung')
+INSERT INTO `users` (`id`, `username`, `email`, `password`, `full_name`, `role`)
+VALUES
+(1, 'rully', 'rully@familycare.id', 'demo123', 'Rully Santoso (Keluarga Utama)', 'FAMILY_PRIMARY')
 ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`);
 
-INSERT INTO `devices` (`id`, `patient_id`, `device_type`, `model_name`, `status`)
+INSERT INTO `patients` (`id`, `patient_code`, `full_name`, `age`, `gender`, `room_number`, `condition_summary`)
+VALUES 
+(1, 'ELD-001', 'Opa Budi Santoso', 71, 'MALE', 'Kamar Utama (Lantai 1)', 'Hipertensi terkontrol Amlodipine 5mg. Riwayat pusing saat bangun tidur'),
+(2, 'ELD-002', 'Oma Siti Rahma', 68, 'FEMALE', 'Paviliun Melati', 'Kondisi stabil, rutin konsumsi vitamin & obat jantung')
+ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`);
+
+INSERT INTO `devices` (`id`, `patient_id`, `device_token`, `device_type`, `model_name`, `status`)
 VALUES
-('HUAWEI-WATCH-001', 1, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE'),
-('ECA-HOME-001', 1, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')
-ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
+('HUAWEI-WATCH-001', 1, 'HUAWEI-ECA-8821', 'watch', 'Huawei Smart Health Band Pro', 'ONLINE'),
+('ECA-HOME-001', 1, 'HUAWEI-ECA-8821', 'home', 'Huawei Smart Home Safety Node', 'ONLINE')
+ON DUPLICATE KEY UPDATE `device_token` = VALUES(`device_token`);
 
 INSERT INTO `emergency_contacts` (`patient_id`, `name`, `relationship`, `phone_number`, `priority_order`, `is_primary`)
 VALUES

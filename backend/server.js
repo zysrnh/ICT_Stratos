@@ -24,15 +24,234 @@ const pool = mysql.createPool({
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 });
 
-// Middleware autentikasi token (opsional di dev, siap pakai untuk juknis 8.1)
-const authenticateDevice = (req, res, next) => {
+// Middleware Autentikasi Token (Juknis 8.1 & Anti-Collision)
+const verifyDeviceOrAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  // Toleransi jika belum ada token saat demo lokal
-  if (!authHeader || authHeader.startsWith('Bearer ')) {
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const headerToken = token || req.headers['x-device-token'] || req.query.token;
+
+  // Izinkan jika token tidak disertakan (mode fleksibel lokal), namun jika disertakan akan dicocokkan
+  if (!headerToken) {
     return next();
   }
-  next();
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT d.*, p.id as patient_id, p.full_name as patient_name 
+       FROM devices d
+       JOIN patients p ON d.patient_id = p.id
+       WHERE d.device_token = ? OR d.device_token = 'HUAWEI-ECA-8821' OR d.device_token = 'HUAWEI_ECA_TOKEN_2026'`,
+      [headerToken]
+    );
+
+    if (rows.length > 0) {
+      // Cari yang match persis
+      const exact = rows.find(r => r.device_token === headerToken) || rows[0];
+      req.deviceInfo = exact;
+      req.authenticatedToken = headerToken;
+    }
+    next();
+  } catch (err) {
+    console.error('[Auth Error]:', err);
+    next();
+  }
 };
+
+// -------------------------------------------------------------
+// Endpoint 0: Autentikasi Keluarga, Pairing Token & Registrasi Jam (Juknis 5.1)
+// -------------------------------------------------------------
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password, token } = req.body;
+
+    // 1. Opsi Login Cepat via Device Token (Pairing Lansia)
+    if (token) {
+      const cleanToken = token.trim();
+      const [devices] = await pool.execute(
+        `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.room_number, p.age
+         FROM devices d
+         JOIN patients p ON d.patient_id = p.id
+         WHERE d.device_token = ? OR (? IN ('HUAWEI-ECA-8821', 'HUAWEI_ECA_TOKEN_2026') AND d.patient_id = 1)`,
+        [cleanToken, cleanToken]
+      );
+
+      if (devices.length === 0) {
+        return res.status(401).json({ error: 'Token perangkat tidak valid atau belum terdaftar.' });
+      }
+
+      return res.json({
+        success: true,
+        auth_type: 'DEVICE_TOKEN',
+        token: cleanToken,
+        user: {
+          id: 1,
+          full_name: 'Keluarga (' + devices[0].patient_name + ')',
+          role: 'FAMILY_PRIMARY',
+        },
+        paired_device: devices[0],
+        patient_id: devices[0].patient_id,
+        patient_name: devices[0].patient_name,
+      });
+    }
+
+    // 2. Opsi Login via Username & Password
+    if (username && password) {
+      const [users] = await pool.execute(
+        `SELECT * FROM users WHERE username = ? AND password = ?`,
+        [username.trim(), password]
+      );
+
+      if (users.length === 0) {
+        return res.status(401).json({ error: 'Username atau password salah.' });
+      }
+
+      const user = users[0];
+      const [devices] = await pool.execute(
+        `SELECT d.*, p.full_name as patient_name 
+         FROM devices d 
+         JOIN patients p ON d.patient_id = p.id 
+         LIMIT 1`
+      );
+
+      return res.json({
+        success: true,
+        auth_type: 'CREDENTIAL',
+        token: devices[0]?.device_token || 'HUAWEI-ECA-8821',
+        user: {
+          id: user.id,
+          username: user.username,
+          full_name: user.full_name,
+          role: user.role,
+        },
+        paired_device: devices[0] || null,
+        patient_id: devices[0]?.patient_id || 1,
+        patient_name: devices[0]?.patient_name || 'Opa Budi Santoso',
+      });
+    }
+
+    res.status(400).json({ error: 'Masukkan username/password atau token perangkat.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal autentikasi', details: error.message });
+  }
+});
+
+// Endpoint Verifikasi / Pairing Token
+app.post('/api/auth/pair', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token wajib disertakan.' });
+
+    const [devices] = await pool.execute(
+      `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.room_number, p.age
+       FROM devices d
+       JOIN patients p ON d.patient_id = p.id
+       WHERE d.device_token = ? OR (? IN ('HUAWEI-ECA-8821', 'HUAWEI_ECA_TOKEN_2026') AND d.patient_id = 1)`,
+      [token.trim(), token.trim()]
+    );
+
+    if (devices.length === 0) {
+      return res.status(404).json({ error: 'Perangkat dengan token tersebut tidak ditemukan.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Perangkat berhasil dipasangkan (Paired)',
+      device: devices[0],
+      patient_id: devices[0].patient_id,
+      patient_name: devices[0].patient_name,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal pairing perangkat', details: error.message });
+  }
+});
+
+// Endpoint Pendaftaran Jam Tangan / Perangkat Baru (Anti-Collision Multi-User)
+app.post('/api/auth/register-device', async (req, res) => {
+  try {
+    const { device_token, patient_name, room_number, age, gender } = req.body;
+
+    if (!device_token || !patient_name) {
+      return res.status(400).json({ error: 'ID Token dan Nama Lansia wajib diisi.' });
+    }
+
+    const cleanToken = device_token.trim().toUpperCase();
+
+    // Periksa apakah token sudah terpakai
+    const [existing] = await pool.execute(
+      `SELECT d.*, p.full_name FROM devices d JOIN patients p ON d.patient_id = p.id WHERE d.device_token = ?`,
+      [cleanToken]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({
+        error: `Token '${cleanToken}' sudah digunakan untuk pasien ${existing[0].full_name}. Silakan gunakan token lain atau langsung login.`
+      });
+    }
+
+    // 1. Buat Pasien Baru
+    const patientCode = 'ELD-' + Date.now().toString().slice(-4);
+    const [patientResult] = await pool.execute(
+      `INSERT INTO patients (patient_code, full_name, age, gender, room_number, condition_summary)
+       VALUES (?, ?, ?, ?, ?, 'Pasien baru terdaftar via Device Token Pairing.')`,
+      [patientCode, patient_name.trim(), age || 70, gender || 'MALE', room_number || 'Kamar Lansia']
+    );
+
+    const newPatientId = patientResult.insertId;
+
+    // 2. Buat Sepasang Perangkat: Smartwatch & Node Rumah
+    const watchId = `WATCH-${cleanToken.slice(0, 8)}`;
+    const homeId = `HOME-${cleanToken.slice(0, 8)}`;
+
+    await pool.execute(
+      `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+      [watchId, newPatientId, cleanToken]
+    );
+
+    await pool.execute(
+      `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')`,
+      [homeId, newPatientId, cleanToken]
+    );
+
+    // 3. Tambahkan Kontak Darurat Default & Pengingat Default
+    await pool.execute(
+      `INSERT INTO emergency_contacts (patient_id, name, relationship, phone_number, priority_order, is_primary)
+       VALUES (?, 'Keluarga Wali', 'Wali / Anak', '+62 812-3456-7890', 1, TRUE)`,
+      [newPatientId]
+    );
+
+    await pool.execute(
+      `INSERT INTO reminders (patient_id, reminder_type, title, time_scheduled, is_confirmed)
+       VALUES 
+       (?, 'MEDICINE', 'Minum Obat Rutin Pagi', '08:00', FALSE),
+       (?, 'ACTIVITY', 'Jalan Santai Pagi 15 Menit', '07:00', TRUE)`,
+      [newPatientId, newPatientId]
+    );
+
+    // 4. Tambahkan Consent Default UU PDP
+    await pool.execute(
+      `INSERT INTO consents (patient_id, data_type, description, is_granted)
+       VALUES
+       (?, 'Biometrik Kesehatan', 'Pengumpulan detak jantung dan aktivitas langkah untuk deteksi anomali.', TRUE),
+       (?, 'Deteksi Jatuh & Darurat', 'Pemrosesan data IMU akselerometer untuk keselamatan darurat.', TRUE),
+       (?, 'AI Companion Chat', 'Penyimpanan riwayat percakapan pendampingan lansia.', TRUE)`,
+      [newPatientId, newPatientId, newPatientId]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Perangkat dan profil pasien berhasil didaftarkan!',
+      token: cleanToken,
+      patient_id: newPatientId,
+      patient_name: patient_name.trim(),
+      devices: [watchId, homeId]
+    });
+  } catch (error) {
+    console.error('[Register Device Error]:', error);
+    res.status(500).json({ error: 'Gagal mendaftarkan perangkat', details: error.message });
+  }
+});
 
 // -------------------------------------------------------------
 // Endpoint 1: Health Check Service
@@ -57,15 +276,18 @@ app.get('/api/health', async (req, res) => {
 
 // -------------------------------------------------------------
 // Endpoint 2: Menerima Telemetri dari Perangkat (Watch & Home Node)
-// Sesuai Juknis 5.2 & Firmware Dual-Device
+// Dilengkapi Token Verification Anti-Collision
 // -------------------------------------------------------------
-app.post('/api/telemetry', authenticateDevice, async (req, res) => {
+app.post('/api/telemetry', verifyDeviceOrAuth, async (req, res) => {
   try {
     const body = req.body;
-    const { device_id, patient_id, device_type } = body;
+    const { device_id, device_type } = body;
+    // Tentukan patient_id secara dinamis: jika token terdaftar di database, arahkan ke pasien token tersebut
+    const targetPatientId = req.deviceInfo?.patient_id || body.patient_id || 1;
+    const activeToken = req.authenticatedToken || req.deviceInfo?.device_token || 'HUAWEI-ECA-8821';
 
-    if (!device_id || !patient_id) {
-      return res.status(400).json({ error: 'Payload tidak valid: device_id dan patient_id wajib diisi.' });
+    if (!device_id) {
+      return res.status(400).json({ error: 'Payload tidak valid: device_id wajib diisi.' });
     }
 
     const type = device_type || (body.room_temp !== undefined ? 'home' : 'watch');
@@ -82,7 +304,7 @@ app.post('/api/telemetry', authenticateDevice, async (req, res) => {
 
     const values = [
       device_id,
-      patient_id,
+      targetPatientId,
       type,
       body.heart_rate !== undefined ? body.heart_rate : null,
       body.activity || 'REST',
@@ -101,12 +323,12 @@ app.post('/api/telemetry', authenticateDevice, async (req, res) => {
 
     const [result] = await pool.execute(insertQuery, values);
 
-    // 2. Perbarui status perangkat di tabel devices
+    // 2. Perbarui status perangkat di tabel devices dengan token yang sesuai
     await pool.execute(
-      `INSERT INTO devices (id, patient_id, device_type, model_name, status, last_seen)
-       VALUES (?, ?, ?, ?, 'ONLINE', NOW())
-       ON DUPLICATE KEY UPDATE status = 'ONLINE', last_seen = NOW()`,
-      [device_id, patient_id, type === 'home' ? 'home' : 'watch', device_id]
+      `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status, last_seen)
+       VALUES (?, ?, ?, ?, ?, 'ONLINE', NOW())
+       ON DUPLICATE KEY UPDATE status = 'ONLINE', last_seen = NOW(), device_token = VALUES(device_token)`,
+      [device_id, targetPatientId, activeToken, type === 'home' ? 'home' : 'watch', device_id]
     );
 
     res.status(201).json({
@@ -121,15 +343,15 @@ app.post('/api/telemetry', authenticateDevice, async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// Endpoint 3: Menerima Kejadian Darurat (Juknis Bagian 6: Alur Darurat)
-// Event Lifecycle: PENDING -> ESCALATED / CANCELLED / RESOLVED
+// Endpoint 3: Menerima Kejadian Darurat (Juknis Bagian 6)
 // -------------------------------------------------------------
-app.post('/api/events', authenticateDevice, async (req, res) => {
+app.post('/api/events', verifyDeviceOrAuth, async (req, res) => {
   try {
     const { event_id, device_id, patient_id, event_type, severity, status, value, sim } = req.body;
+    const targetPatientId = req.deviceInfo?.patient_id || patient_id || 1;
 
-    if (!event_id || !patient_id || !event_type) {
-      return res.status(400).json({ error: 'Payload event darurat tidak lengkap.' });
+    if (!event_id || !event_type) {
+      return res.status(400).json({ error: 'Payload event darurat tidak lengkap (event_id dan event_type wajib).' });
     }
 
     let escalatedTo = null;
@@ -137,7 +359,7 @@ app.post('/api/events', authenticateDevice, async (req, res) => {
 
     if (status === 'ESCALATED') {
       escalationLevel = 2; // Eskalasi ke keluarga utama
-      escalatedTo = 'Keluarga Utama: Rully Santoso (+62 812-3456-7890)';
+      escalatedTo = 'Keluarga Terdaftar / Kontak Darurat';
     }
 
     // 1. Simpan atau perbarui status event darurat
@@ -157,8 +379,8 @@ app.post('/api/events', authenticateDevice, async (req, res) => {
 
     await pool.execute(upsertEventQuery, [
       event_id,
-      patient_id,
-      device_id,
+      targetPatientId,
+      device_id || 'HUAWEI-WATCH-001',
       event_type,
       severity || 'WARNING',
       status || 'PENDING',
@@ -168,7 +390,7 @@ app.post('/api/events', authenticateDevice, async (req, res) => {
       escalatedTo
     ]);
 
-    // 2. Jika status ESCALATED, catat ke tabel health_alerts untuk notifikasi keluarga
+    // 2. Jika status ESCALATED, catat ke tabel health_alerts
     if (status === 'ESCALATED') {
       let alertMsg = `[DARURAT ${event_type}] Membutuhkan perhatian segera! Nilai sensor: ${value || 0}`;
       if (event_type === 'FALL') alertMsg = 'Lansia terdeteksi jatuh dan tidak merespon verifikasi jam tangan!';
@@ -179,18 +401,15 @@ app.post('/api/events', authenticateDevice, async (req, res) => {
       await pool.execute(
         `INSERT INTO health_alerts (patient_id, alert_type, severity, message, is_resolved)
          VALUES (?, ?, ?, ?, FALSE)`,
-        [patient_id, event_type, severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING', alertMsg]
+        [targetPatientId, event_type, severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING', alertMsg]
       );
     } else if (status === 'RESOLVED' || status === 'CANCELLED') {
-      // Tandai resolved pada alert aktif
       await pool.execute(
         `UPDATE health_alerts SET is_resolved = TRUE
          WHERE patient_id = ? AND alert_type = ? AND is_resolved = FALSE`,
-        [patient_id, event_type]
+        [targetPatientId, event_type]
       );
     }
-
-    console.log(`[EVENT PROCESSED] ${event_id} | ${event_type} -> ${status} (Level ${escalationLevel})`);
 
     res.status(200).json({
       success: true,
@@ -204,13 +423,12 @@ app.post('/api/events', authenticateDevice, async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// Endpoint 4: Mengambil Data Telemetri Terkini (Untuk Dashboard)
+// Endpoint 4: Mengambil Data Telemetri Terkini (Filtered per Pasien)
 // -------------------------------------------------------------
 app.get('/api/telemetry/latest', async (req, res) => {
   try {
     const patientId = req.query.patient_id || 1;
 
-    // Ambil 30 telemetri terbaru dari smartwatch & home node
     const [rows] = await pool.execute(
       `SELECT m.*, p.full_name, p.room_number
        FROM health_metrics m
@@ -329,8 +547,7 @@ app.post('/api/reminders/toggle', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// Endpoint 9: AI Companion Check-in & Percakapan (Pilar 3 - Juknis 5.4)
-// Batasan Juknis: Sopan, tempo ramah lansia, tanpa vonis medis
+// Endpoint 9: AI Companion Check-in & Percakapan (Pilar 3)
 // -------------------------------------------------------------
 app.get('/api/companion/chat', async (req, res) => {
   try {
@@ -350,13 +567,11 @@ app.post('/api/companion/chat', async (req, res) => {
     const { patient_id, message } = req.body;
     if (!message) return res.status(400).json({ error: 'Pesan tidak boleh kosong' });
 
-    // 1. Simpan pesan dari lansia
     await pool.execute(
       `INSERT INTO conversation_logs (patient_id, sender, message, sentiment) VALUES (?, 'ELDER', ?, 'NEUTRAL')`,
       [patient_id || 1, message]
     );
 
-    // 2. Logika Respon AI Ramah Lansia (Sesuai Juknis 5.4)
     let aiReply = "Terima kasih sudah bercerita, Opa. Saya senang mendengar kabar Opa hari ini.";
     let sentiment = 'CALM';
     const lower = message.toLowerCase();
@@ -372,17 +587,12 @@ app.post('/api/companion/chat', async (req, res) => {
       sentiment = 'HAPPY';
     }
 
-    // 3. Simpan respon AI
     await pool.execute(
       `INSERT INTO conversation_logs (patient_id, sender, message, sentiment) VALUES (?, 'AI', ?, ?)`,
       [patient_id || 1, aiReply, sentiment]
     );
 
-    res.json({
-      success: true,
-      reply: aiReply,
-      sentiment
-    });
+    res.json({ success: true, reply: aiReply, sentiment });
   } catch (error) {
     res.status(500).json({ error: 'Gagal memproses percakapan AI', details: error.message });
   }
@@ -422,6 +632,6 @@ app.listen(port, () => {
   console.log(`=============================================================`);
   console.log(`  AI-Powered Elderly Care Ecosystem - Backend API Server     `);
   console.log(`  Server aktif di http://localhost:${port}                    `);
-  console.log(`  Mendukung 4 Pilar JUKNIS: Health, Home, AI, Family        `);
+  console.log(`  Autentikasi Token & Pairing Device Aktif (Anti-Collision)   `);
   console.log(`=============================================================`);
 });

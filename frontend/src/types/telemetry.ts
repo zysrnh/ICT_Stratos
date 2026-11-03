@@ -110,3 +110,32 @@ export interface ConversationMessage {
   sentiment: string;
   created_at: string;
 }
+
+export interface AuthUser {
+  id: number;
+  username?: string;
+  full_name: string;
+  role: string;
+}
+
+export interface PairedDevice {
+  id: string;
+  patient_id: number;
+  device_token: string;
+  device_type: string;
+  model_name: string;
+  status: string;
+  last_seen?: string;
+  patient_name?: string;
+  room_number?: string;
+  age?: number;
+}
+
+export interface AuthSession {
+  token: string;
+  auth_type: 'CREDENTIAL' | 'DEVICE_TOKEN';
+  user: AuthUser;
+  paired_device: PairedDevice | null;
+  patient_id: number;
+  patient_name: string;
+}
