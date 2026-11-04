@@ -59,6 +59,8 @@ const char* WIFI_PASS = "";
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
 char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Di-generate dinamis saat boot)
+bool isPaired             = false;                // False: Standby di layar QR | True: Aktif monitoring
+char pairedPatientName[64]= "Opa Budi Santoso";  // Nama lansia hasil pairing dari web
 
 // ==========================================
 // Identitas
@@ -226,10 +228,9 @@ void disp_qrcode_callback(esp_qrcode_handle_t qrcode) {
   }
 
   display.setCursor(58, 43);
-  display.print("SCAN KAMERA");
-  
+  display.print("STATUS:");
   display.setCursor(58, 54);
-  display.print("TEKAN OK = OK");
+  display.print(isPaired ? "AKTIF" : "WAIT WEB");
 
   display.display();
 }
@@ -251,6 +252,69 @@ void drawQrCodeScreen() {
   cfg.qrcode_ecc_level = ESP_QRCODE_ECC_LOW;
 
   esp_qrcode_generate(&cfg, activeToken);
+}
+
+// ==========================================
+// Tampilan Layar Selamat Datang Setelah Pairing Berhasil
+// ==========================================
+void drawWelcomeScreen() {
+  display.clearDisplay();
+  display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK);
+  display.setTextSize(1);
+  display.setCursor(4, 2);
+  display.print("* PAIRING BERHASIL! *");
+
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(4, 18);
+  display.print("Selamat Datang:");
+
+  display.setCursor(4, 30);
+  display.setTextSize(1);
+  display.print(pairedPatientName);
+
+  display.drawLine(0, 46, 127, 46, SSD1306_WHITE);
+  display.setCursor(4, 52);
+  display.print("Smartwatch Huawei Aktif");
+  display.display();
+
+  // Nada gembira tanda sukses pairing
+  tone(BUZZER_PIN, 784, 120); delay(140);
+  tone(BUZZER_PIN, 1046, 250); delay(260);
+  noTone(BUZZER_PIN);
+}
+
+// Cek status pairing ke Cloud Backend
+bool checkCloudPairing() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+#if USE_HTTPS
+  WiFiClientSecure client;
+  client.setInsecure();
+#else
+  WiFiClient client;
+#endif
+  HTTPClient http;
+  String url = String(API_BASE) + "/api/device/check-pair?token=" + activeToken;
+  http.begin(client, url);
+  http.setConnectTimeout(2500);
+  http.setTimeout(3000);
+  int httpCode = http.GET();
+  bool paired = false;
+  if (httpCode == 200) {
+    String payload = http.getString();
+    StaticJsonDocument<256> doc;
+    deserializeJson(doc, payload);
+    if (doc["paired"].as<bool>()) {
+      paired = true;
+      const char* pName = doc["patient_name"];
+      if (pName && strlen(pName) > 0) {
+        strlcpy(pairedPatientName, pName, sizeof(pairedPatientName));
+      }
+    }
+  }
+  http.end();
+  return paired;
 }
 
 // ==========================================
@@ -356,6 +420,7 @@ int postJson(const char* url, const char* body) {
 
 void netTask(void*) {
   unsigned long lastRetry = 0;
+  unsigned long lastPairCheck = 0;
   for (;;) {
     if (WiFi.status() != WL_CONNECTED) {
       digitalWrite(LED_SYNC, LOW);
@@ -363,6 +428,22 @@ void netTask(void*) {
       vTaskDelay(pdMS_TO_TICKS(500));
       continue;
     }
+
+    // Jika belum dipasangkan dengan web, cek status pairing secara berkala
+    if (!isPaired) {
+      if (millis() - lastPairCheck > 2000UL) {
+        lastPairCheck = millis();
+        if (checkCloudPairing()) {
+          isPaired = true;
+          Serial.printf("[Cloud] Pairing terdeteksi! Lansia: %s\n", pairedPatientName);
+          drawWelcomeScreen();
+          vTaskDelay(pdMS_TO_TICKS(2500));
+        }
+      }
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;
+    }
+
     NetMsg m;
     if (xQueuePeek(evtQ, &m, 0) == pdTRUE) {
       int code = postJson(URL_EVENTS, m.body);
@@ -526,6 +607,12 @@ void runCmd(char* s) {
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
   else if (!strcmp(s, "smoke")) { simSmoke = true; }
   else if (!strcmp(s, "clear")) { simSmoke = false; }
+  else if (!strcmp(s, "ok") || !strcmp(s, "bypass")) {
+    isPaired = true;
+    Serial.println("[PAIRING] Manual bypass via serial command!");
+    drawWelcomeScreen();
+    delay(1500);
+  }
   else if (!strcmp(s, "qr") || !strcmp(s, "pair")) {
     drawQrCodeScreen();
     Serial.printf("\n[SMARTWATCH QR PAIRING]\n  TOKEN AKTIF : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
@@ -667,17 +754,8 @@ void setup() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("[Display] SSD1306 tidak terdeteksi!");
   } else {
-    // Tampilkan Layar QR Code Asli untuk Pairing Smartwatch
+    // Tampilkan Layar QR Code Dinamis untuk Pairing Smartwatch (Standby menunggu web)
     drawQrCodeScreen();
-
-    // Tunggu hingga 5 detik atau sampai tombol OK ditekan
-    unsigned long waitStart = millis();
-    while (millis() - waitStart < 5000) {
-      if (digitalRead(BTN_OK) == LOW) {
-        break; // Lansia / Penguji tekan OK untuk langsung mulai
-      }
-      delay(50);
-    }
   }
 
   // Cetak Banner Pairing Siap Pakai di Serial Monitor
@@ -689,8 +767,9 @@ void setup() {
   Serial.printf ("  URL PAIRING : https://%s/?pair=%s\n", API_HOST, activeToken);
   Serial.println("=============================================================");
   Serial.println("👉 Klik link URL PAIRING di atas untuk langsung menghubungkan ke Chrome!\n");
-  Serial.println("[INFO] Ketik 'qr' di Serial Monitor untuk menampilkan QR Code lagi.");
-  Serial.println("[INFO] Ketik 'token <id>' atau 'token new' untuk mengganti Token.\n");
+  Serial.println("[INFO] Jam tangan dalam status STANDBY menunggu pairing dari Web.");
+  Serial.println("[INFO] Tekan tombol hijau OK atau ketik 'ok' di Serial untuk bypass manual.");
+  Serial.println("[INFO] Ketik 'qr' di Serial Monitor untuk menampilkan QR Code lagi.\n");
 
   mpuOk = initMpu();
   Serial.println(mpuOk ? "[MPU6050] OK" : "[MPU6050] TIDAK TERDETEKSI - deteksi jatuh nonaktif");
@@ -709,9 +788,36 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
-  static unsigned long lastImu = 0, lastHr = 0, lastDht = 0, lastSmoke = 0, lastUi = 0, lastTel = 0;
+  static unsigned long lastImu = 0, lastHr = 0, lastDht = 0, lastSmoke = 0, lastUi = 0, lastTel = 0, lastQr = 0;
 
   handleSerial();
+
+  // Tombol OK: Jika belum paired, menekan OK mem-bypass manual ke status operasional aktif
+  if (btnEdge(btnOk)) {
+    if (!isPaired) {
+      isPaired = true;
+      Serial.println("[PAIRING] Manual bypass via tombol OK ditekan!");
+      drawWelcomeScreen();
+      delay(1500);
+      return;
+    } else {
+      onOkPressed();
+    }
+  }
+
+  // Jika jam tangan BELUM PAIRED dengan web:
+  // Tetap diam di layar QR Code, jangan jalankan detak jantung / alarm / telemetri!
+  if (!isPaired) {
+    if (now - lastQr >= 2000) {
+      lastQr = now;
+      drawQrCodeScreen();
+    }
+    delay(20);
+    return;
+  }
+
+  // Tombol SOS hanya aktif saat jam sudah operasional
+  if (btnEdge(btnSos)) raiseAlert(K_SOS, 0, "CRITICAL", false);
 
   // --- IMU 50 Hz: langkah, aktivitas, jatuh ---
   if (mpuOk && now - lastImu >= 20) {

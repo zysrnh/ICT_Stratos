@@ -420,6 +420,37 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Endpoint Cek Status Pairing Smartwatch (Dipanggil oleh ESP32 Wokwi saat Layar QR Aktif)
+app.get('/api/device/check-pair', async (req, res) => {
+  try {
+    const token = req.query.token;
+    if (!token) return res.status(400).json({ paired: false, error: 'Token wajib disertakan' });
+    const cleanToken = token.trim().toUpperCase();
+
+    // Cek apakah token sudah dipasangkan dengan pasien yang valid (bukan placeholder unconfigured)
+    const [rows] = await pool.execute(
+      `SELECT d.*, p.full_name as patient_name, p.id as patient_id
+       FROM devices d
+       JOIN patients p ON d.patient_id = p.id
+       WHERE d.device_token = ? AND p.full_name NOT LIKE 'Lansia (%'`,
+      [cleanToken]
+    );
+
+    if (rows.length > 0) {
+      return res.json({
+        paired: true,
+        patient_name: rows[0].patient_name,
+        patient_id: rows[0].patient_id,
+        token: cleanToken,
+      });
+    }
+
+    res.json({ paired: false, token: cleanToken });
+  } catch (err) {
+    res.status(500).json({ paired: false, error: err.message });
+  }
+});
+
 // Endpoint Verifikasi / Pairing Token (Bisa Sambung Eksisting atau Bikin Profil Baru Otomatis)
 app.post('/api/auth/pair', async (req, res) => {
   try {
