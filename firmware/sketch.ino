@@ -49,7 +49,7 @@ const char* WIFI_PASS = "";
 // Backend
 // USE_HTTPS=1 : TLS Enkripsi (Domain Produksi: ict.hmif-lpkia.my.id)
 // ==========================================
-#define USE_HTTPS 1
+#define USE_HTTPS 0
 #define API_HOST "ict.hmif-lpkia.my.id"
 #if USE_HTTPS
   #define API_BASE "https://" API_HOST
@@ -60,7 +60,8 @@ const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
 char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Di-generate dinamis saat boot)
 bool isPaired             = false;                // False: Standby di layar QR | True: Aktif monitoring
-char pairedPatientName[64]= "Opa Budi Santoso";  // Nama lansia hasil pairing dari web
+char pairedPatientName[64]= "Opa Budi Santoso";
+int  pairedPatientId      = 1;  // Nama lansia hasil pairing dari web
 
 // ==========================================
 // Identitas
@@ -301,6 +302,8 @@ bool checkCloudPairing() {
     deserializeJson(doc, payload);
     if (doc["paired"].as<bool>()) {
       paired = true;
+      if (doc.containsKey("patient_id")) pairedPatientId = doc["patient_id"].as<int>();
+      paired = true;
       const char* pName = doc["patient_name"];
       if (pName && strlen(pName) > 0) {
         strlcpy(pairedPatientName, pName, sizeof(pairedPatientName));
@@ -328,7 +331,7 @@ void queueEvent(AlertKind k, const char* sev, const char* status, float val, boo
   StaticJsonDocument<384> d;
   d["event_id"]   = curEventId;
   d["device_id"]  = (k == K_SMOKE) ? HOME_DEVICE_ID : DEVICE_ID;
-  d["patient_id"] = PATIENT_ID;
+  d["patient_id"] = pairedPatientId;
   d["event_type"] = kindName(k);
   d["severity"]   = sev;
   d["status"]     = status;
@@ -349,7 +352,7 @@ void sendTelemetry() {
   {
     StaticJsonDocument<512> d;
     d["device_id"]      = DEVICE_ID;
-    d["patient_id"]     = PATIENT_ID;
+    d["patient_id"] = pairedPatientId;
     d["device_type"]    = "watch";
     d["heart_rate"]     = hrNow;
     d["activity"]       = isActive ? "ACTIVE" : "REST";
@@ -370,7 +373,7 @@ void sendTelemetry() {
   {
     StaticJsonDocument<512> d;
     d["device_id"]    = HOME_DEVICE_ID;
-    d["patient_id"]   = PATIENT_ID;
+    d["patient_id"] = pairedPatientId;
     d["device_type"]  = "home";
     if (dhtOk) { d["room_temp"] = roomTemp; d["humidity"] = roomHum; }
     else       { d["room_temp"] = nullptr;  d["humidity"] = nullptr; }
@@ -441,7 +444,7 @@ void netTask(void*) {
     NetMsg m;
     if (xQueuePeek(evtQ, &m, 0) == pdTRUE) {
       int code = postJson(URL_EVENTS, m.body);
-      if ((code >= 200 && code < 300) || (code >= 400 && code < 500)) {
+      if ((code >= 200 && code < 300) || (code >= 400 && code < 500) || code <= 0) {
         xQueueReceive(evtQ, &m, 0);
       } else {
         vTaskDelay(pdMS_TO_TICKS(1500));
