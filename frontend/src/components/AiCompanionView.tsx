@@ -9,6 +9,8 @@ import {
   Heart,
   Footprints,
   Coffee,
+  Volume2,
+  RotateCcw,
 } from 'lucide-react';
 import type { ReminderItem, ConversationMessage, AuthSession } from '../types/telemetry';
 import {
@@ -16,6 +18,7 @@ import {
   toggleReminder,
   fetchCompanionChat,
   sendCompanionMessage,
+  clearCompanionChat,
 } from '../services/api';
 
 interface AiCompanionViewProps {
@@ -31,6 +34,7 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +64,32 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
   const handleToggleReminder = async (id: number, currentStatus: boolean) => {
     await toggleReminder(id, !currentStatus);
     loadData();
+  };
+
+  const handleClearChat = async () => {
+    if (confirm('Bersihkan riwayat percakapan dan mulai sesi baru?')) {
+      await clearCompanionChat(patientId);
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      loadData();
+    }
+  };
+
+  const handleSpeak = (id: number, text: string) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      if (speakingId === id) {
+        window.speechSynthesis.cancel();
+        setSpeakingId(null);
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'id-ID';
+      utterance.rate = 0.95;
+      utterance.onend = () => setSpeakingId(null);
+      utterance.onerror = () => setSpeakingId(null);
+      setSpeakingId(id);
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const handleSendPrompt = async (textToSend: string) => {
@@ -212,10 +242,23 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
               </p>
             </div>
           </div>
-          <span className="text-xs bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-none border border-emerald-300 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Siap Mendampingi
-          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearChat}
+              title="Bersihkan riwayat obrolan & mulai sesi baru"
+              className="p-1.5 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-700 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[10px] font-bold">Reset Chat</span>
+            </button>
+
+            <span className="text-xs bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-none border border-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Siap
+            </span>
+          </div>
         </div>
 
         {/* Quick Suggestion Chips (Tanya Cepat Real-time) */}
@@ -271,6 +314,7 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
           ) : (
             messages.map((m) => {
               const isAI = m.sender === 'AI';
+              const isSpeaking = speakingId === m.id;
               return (
                 <div
                   key={m.id}
@@ -284,6 +328,24 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{m.message}</p>
+
+                    {/* Tombol Suara TTS untuk Balasan AI */}
+                    {isAI && (
+                      <div className="mt-2.5 pt-2 border-t border-neutral-200 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => handleSpeak(m.id, m.message)}
+                          className={`text-[11px] font-bold flex items-center gap-1.5 px-2 py-0.5 border cursor-pointer transition-colors ${
+                            isSpeaking
+                              ? 'bg-rose-100 border-rose-400 text-rose-700 animate-pulse'
+                              : 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          <Volume2 className="w-3 h-3" />
+                          <span>{isSpeaking ? 'Hentikan Suara' : 'Dengarkan Suara'}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-medium">
                     <span>
@@ -324,7 +386,7 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder={`Ketik pesan dari ${patientName} (misal: 'Saya agak lemas nak', 'Detak jantung saya berapa?')...`}
+              placeholder={`Ketik keluhan atau sapaan dari ${patientName} (misal: 'Jantung berdebar kencang nak', 'Mual')...`}
               disabled={isSending}
               className="flex-1 bg-white border-2 border-neutral-300 focus:border-neutral-900 rounded-none px-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none transition-colors"
             />

@@ -288,6 +288,20 @@ export async function sendCompanionMessage(patientId: number, message: string): 
   }
 }
 
+export async function clearCompanionChat(patientId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/companion/clear`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ patient_id: patientId }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[Clear Companion Error]:', err);
+    return false;
+  }
+}
+
 export async function fetchConsents(patientId?: number): Promise<ConsentItem[]> {
   try {
     const session = getSavedSession();

@@ -996,7 +996,7 @@ PANDUAN MENJAWAB KELUHAN DAN PERTANYAAN LANSIA (SANGAT PENTING):
    - Ingatkan lansia untuk segera melapor ke keluarga atau dokter jika keluhan terus berlanjut atau bertambah parah.
 2. LARANGAN CODING / TOPIK UMUM DI LUAR KESEHATAN: JANGAN PERNAH melayani permintaan coding, pembuatan script, pemrograman komputer, matematika rumit, atau topik teknis umum. Jika ditanya hal tersebut, tolak dengan sangat santun dan alihkan kembali ke kondisi atau perasaan lansia.
 3. KONSULTASI DATA REAL-TIME: Jika lansia menanyakan kondisi kesehatannya (misal: "berapa detak jantung saya?", "sudah berapa langkah hari ini?", atau "obat apa yang harus diminum?"), sebutkan data real-time di atas dengan jelas dan menenangkan.
-4. GAYA BICARA: Hangat, santun, bersahabat, empatik, seperti seorang cucu atau perawat keluarga yang penuh kasih sayang. Gunakan kalimat ringkas (2-3 kalimat saja), tidak bertele-tele, dan mudah dipahami oleh orang tua.
+4. GAYA BICARA & SEBUTAN: Hangat, santun, bersahabat, empatik, seperti seorang cucu atau perawat muda yang merawat orang tua. Selalu panggil lansia dengan "${salutation}". JANGAN PERNAH memanggil lansia dengan sebutan "Nak" (karena lansia lebih tua dari kamu). Gunakan kalimat 2-4 kalimat yang tuntas, berbobot, ramah, dan tidak berbelit-belit.
 5. TANPA LABEL / FORMAT KAKU: JANGAN PERNAH menyebut dirimu model bahasa atau Gemini. JANGAN gunakan tanda bintang tebal (**) berlebihan. Gunakan teks bahasa Indonesia lisan yang alami, sopan, dan mengalir.`;
 
   // 6. Buat Payload Contents yang Strictly Alternating (user -> model -> user)
@@ -1023,7 +1023,7 @@ PANDUAN MENJAWAB KELUHAN DAN PERTANYAAN LANSIA (SANGAT PENTING):
   // Tentukan perkiraan sentimen awal dari pesan lansia
   const lowerMsg = userMessage.toLowerCase();
   let sentiment = 'CALM';
-  if (lowerMsg.includes('sakit') || lowerMsg.includes('pusing') || lowerMsg.includes('mual') || lowerMsg.includes('lemas') || lowerMsg.includes('takut') || lowerMsg.includes('sesak') || lowerMsg.includes('nyeri') || lowerMsg.includes('jatuh')) {
+  if (lowerMsg.includes('sakit') || lowerMsg.includes('pusing') || lowerMsg.includes('mual') || lowerMsg.includes('lemas') || lowerMsg.includes('takut') || lowerMsg.includes('sesak') || lowerMsg.includes('nyeri') || lowerMsg.includes('jatuh') || lowerMsg.includes('copot') || lowerMsg.includes('tolong')) {
     sentiment = 'ANXIOUS';
   } else if (lowerMsg.includes('senang') || lowerMsg.includes('sehat') || lowerMsg.includes('enak') || lowerMsg.includes('alhamdulillah') || lowerMsg.includes('makasih') || lowerMsg.includes('baik')) {
     sentiment = 'HAPPY';
@@ -1042,7 +1042,10 @@ PANDUAN MENJAWAB KELUHAN DAN PERTANYAAN LANSIA (SANGAT PENTING):
         contents: contents,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 350,
+          maxOutputTokens: 1500,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         }
       })
     });
@@ -1063,14 +1066,14 @@ PANDUAN MENJAWAB KELUHAN DAN PERTANYAAN LANSIA (SANGAT PENTING):
 
   // Fallback responsif jika koneksi Google timeout (harus tetap nyambung dengan topik pesan!)
   let fallbackReply = `Halo ${salutation}! Saya di sini mendampingi ${salutation}. Ada yang bisa saya bantu atau temani hari ini?`;
-  if (lowerMsg.includes('mual')) {
+  if (lowerMsg.includes('copot') || lowerMsg.includes('jantung')) {
+    fallbackReply = `Ya ampun ${salutation}, tarik napas panjang dan hembuskan perlahan ya. Duduk atau rebahkan badan di tempat tidur dengan nyaman. Jika dada terasa nyeri, sesak, atau sangat berdebar, segera pencet tombol SOS di jam tangan atau beri tahu keluarga sekarang ya ${salutation}.`;
+  } else if (lowerMsg.includes('mual')) {
     fallbackReply = `Duh ${salutation}, kalau sedang merasa mual, coba duduk atau berbaring santai dulu ya. Minum air hangat sedikit-sedikit dan hindari makanan berat dulu. Jika mualnya terus terasa, jangan ragu beritahu keluarga ya ${salutation}.`;
   } else if (lowerMsg.includes('pusing') || lowerMsg.includes('lemas')) {
     fallbackReply = `Waduh ${salutation}, kalau merasa pusing atau lemas, jangan langsung berdiri ya. Duduk santai dulu, atur napas, dan minum segelas air hangat. Nanti kalau belum enakan, kita hubungi keluarga ya.`;
   } else if (lowerMsg.includes('obat')) {
     fallbackReply = `Jadwal obat hari ini sudah tercatat di sistem ya ${salutation}. Pastikan diminum sesuai jamnya dengan air putih agar badan tetap fit dan bugar.`;
-  } else if (lowerMsg.includes('jantung') || lowerMsg.includes('detak')) {
-    fallbackReply = `Saat ini sistem sedang membaca sensor jam tangan ${salutation}. Tetap rileks dan santai ya, saya pantau terus detak jantungnya.`;
   }
 
   return { reply: fallbackReply, sentiment };
@@ -1102,6 +1105,21 @@ app.post('/api/companion/chat', async (req, res) => {
   } catch (error) {
     console.error('[Chat Error]:', error);
     res.status(500).json({ error: 'Gagal memproses percakapan AI', details: error.message });
+  }
+});
+
+app.post('/api/companion/clear', async (req, res) => {
+  try {
+    const { patient_id } = req.body;
+    const pId = patient_id || 1;
+    await pool.execute('DELETE FROM conversation_logs WHERE patient_id = ?', [pId]);
+    await pool.execute(
+      `INSERT INTO conversation_logs (patient_id, sender, message, sentiment) VALUES (?, 'AI', 'Halo! Saya Sahabat Peduli, asisten kesehatan dan pendamping Anda hari ini. Ada yang bisa saya bantu atau temani?', 'HAPPY')`,
+      [pId]
+    );
+    res.json({ success: true, message: 'Riwayat obrolan berhasil dibersihkan.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mereset chat', details: error.message });
   }
 });
 
