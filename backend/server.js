@@ -282,16 +282,28 @@ app.get('/api/system/reset-telemetry', async (req, res) => {
   }
 });
 
+// Helper normalisasi token (Mendukung 4 karakter suffix seperti 'FE6B' atau format penuh 'HUAWEI-ECA-FE6B')
+function normalizeToken(raw) {
+  if (!raw) return '';
+  let t = String(raw).trim().toUpperCase();
+  if (t === 'HUAWEI_ECA_TOKEN_2026' || t === 'DEMO') return t;
+  if (t.startsWith('HUAWEI-ECA-')) return t;
+  const code = t.replace(/^HUAWEI-?ECA-?/i, '').replace(/^HUAWEI-?/i, '').replace(/^ECA-?/i, '');
+  return `HUAWEI-ECA-${code}`;
+}
+
 // Middleware Autentikasi Token (Juknis 8.1 & Anti-Collision)
 const verifyDeviceOrAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-  const headerToken = token || req.headers['x-device-token'] || req.query.token;
+  const rawHeaderToken = token || req.headers['x-device-token'] || req.query.token;
 
   // Izinkan jika token tidak disertakan (mode fleksibel lokal), namun jika disertakan akan dicocokkan
-  if (!headerToken) {
+  if (!rawHeaderToken) {
     return next();
   }
+
+  const headerToken = normalizeToken(rawHeaderToken);
 
   try {
     const [rows] = await pool.execute(
@@ -319,17 +331,19 @@ const verifyDeviceOrAuth = async (req, res, next) => {
     } else {
       // Auto-register device jika ESP32 langsung kirim data dengan token baru acak
       const patientCode = 'ELD-' + Date.now().toString().slice(-4);
-      const targetName = `Lansia (${headerToken.slice(-4)})`;
+      const tokenSuffix = headerToken.replace(/[^A-Za-z0-9]/g, '').slice(-4) || Date.now().toString().slice(-4);
+      const targetName = `Lansia (${tokenSuffix})`;
       const [ptRes] = await pool.execute(
         `INSERT INTO patients (patient_code, full_name, age, gender, condition_summary)
          VALUES (?, ?, 70, 'MALE', 'Profil mandiri terdaftar otomatis via Smartwatch.')`,
         [patientCode, targetName]
       );
       const newPid = ptRes.insertId;
-      const watchId = `WATCH-${headerToken.slice(0, 8)}`;
+      const watchId = `WATCH-P${newPid}-${tokenSuffix}`;
       await pool.execute(
         `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
-         VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+         VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')
+         ON DUPLICATE KEY UPDATE patient_id = VALUES(patient_id), device_token = VALUES(device_token), status = 'ONLINE'`,
         [watchId, newPid, headerToken]
       );
       req.deviceInfo = { id: watchId, patient_id: newPid, patient_name: targetName, device_token: headerToken };
@@ -351,7 +365,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // 1. Opsi Login Cepat via Device Token (Pairing Lansia)
     if (token) {
-      const cleanToken = token.trim();
+      const cleanToken = normalizeToken(token);
       const [devices] = await pool.execute(
         `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.room_number, p.age
          FROM devices d
@@ -425,7 +439,7 @@ app.get('/api/device/check-pair', async (req, res) => {
   try {
     const token = req.query.token;
     if (!token) return res.status(400).json({ paired: false, error: 'Token wajib disertakan' });
-    const cleanToken = token.trim().toUpperCase();
+    const cleanToken = normalizeToken(token);
 
     // Cek apakah token sudah dipasangkan dengan pasien yang valid (bukan placeholder unconfigured)
     const [rows] = await pool.execute(
@@ -457,7 +471,7 @@ app.post('/api/auth/pair', async (req, res) => {
     const { token, patient_name, age, gender, condition_summary, is_demo } = req.body;
     if (!token) return res.status(400).json({ error: 'Token wajib disertakan.' });
 
-    const cleanToken = token.trim().toUpperCase();
+    const cleanToken = normalizeToken(token);
 
     // 1. Opsi Akses Cepat Demo (Opa Budi Santoso)
     if (is_demo || (cleanToken === 'HUAWEI-ECA-8821' && (!patient_name || !patient_name.trim()))) {
@@ -524,7 +538,8 @@ app.post('/api/auth/pair', async (req, res) => {
     }
 
     // 3. Jika token baru belum terdaftar, buatkan profil pasien baru secara mandiri!
-    const targetName = (patient_name && patient_name.trim()) || `Lansia (${cleanToken.slice(-4)})`;
+    const tokenSuffix = cleanToken.replace(/[^A-Za-z0-9]/g, '').slice(-4) || Date.now().toString().slice(-4);
+    const targetName = (patient_name && patient_name.trim()) || `Lansia (${tokenSuffix})`;
     const patientCode = 'ELD-' + Date.now().toString().slice(-4);
     const newAge = parseInt(age) || 70;
     const newGender = gender === 'FEMALE' ? 'FEMALE' : 'MALE';
@@ -537,18 +552,20 @@ app.post('/api/auth/pair', async (req, res) => {
     );
 
     const newPatientId = patientResult.insertId;
-    const watchId = `WATCH-${cleanToken.slice(0, 8)}`;
-    const homeId = `HOME-${cleanToken.slice(0, 8)}`;
+    const watchId = `WATCH-P${newPatientId}-${tokenSuffix}`;
+    const homeId = `HOME-P${newPatientId}-${tokenSuffix}`;
 
     await pool.execute(
       `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
-       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')
+       ON DUPLICATE KEY UPDATE patient_id = VALUES(patient_id), device_token = VALUES(device_token), status = 'ONLINE'`,
       [watchId, newPatientId, cleanToken]
     );
 
     await pool.execute(
       `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
-       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')`,
+       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')
+       ON DUPLICATE KEY UPDATE patient_id = VALUES(patient_id), device_token = VALUES(device_token), status = 'ONLINE'`,
       [homeId, newPatientId, cleanToken]
     );
 
@@ -603,7 +620,7 @@ app.post('/api/auth/register-device', async (req, res) => {
       return res.status(400).json({ error: 'ID Token dan Nama Lansia wajib diisi.' });
     }
 
-    const cleanToken = device_token.trim().toUpperCase();
+    const cleanToken = normalizeToken(device_token);
 
     // Periksa apakah token sudah terpakai
     const [existing] = await pool.execute(
@@ -626,20 +643,23 @@ app.post('/api/auth/register-device', async (req, res) => {
     );
 
     const newPatientId = patientResult.insertId;
+    const tokenSuffix = cleanToken.replace(/[^A-Za-z0-9]/g, '').slice(-4) || Date.now().toString().slice(-4);
 
     // 2. Buat Sepasang Perangkat: Smartwatch & Node Rumah
-    const watchId = `WATCH-${cleanToken.slice(0, 8)}`;
-    const homeId = `HOME-${cleanToken.slice(0, 8)}`;
+    const watchId = `WATCH-P${newPatientId}-${tokenSuffix}`;
+    const homeId = `HOME-P${newPatientId}-${tokenSuffix}`;
 
     await pool.execute(
       `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
-       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')
+       ON DUPLICATE KEY UPDATE patient_id = VALUES(patient_id), device_token = VALUES(device_token), status = 'ONLINE'`,
       [watchId, newPatientId, cleanToken]
     );
 
     await pool.execute(
       `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
-       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')`,
+       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')
+       ON DUPLICATE KEY UPDATE patient_id = VALUES(patient_id), device_token = VALUES(device_token), status = 'ONLINE'`,
       [homeId, newPatientId, cleanToken]
     );
 

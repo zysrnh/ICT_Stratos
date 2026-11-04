@@ -32,6 +32,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   isFullScreen = false,
 }) => {
   const [step, setStep] = useState<'scan' | 'configure'>('scan');
+  const [tokenCode, setTokenCode] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [patientName, setPatientName] = useState('');
   const [age, setAge] = useState<number>(70);
@@ -47,7 +48,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get('pair') || params.get('token');
       if (urlToken) {
-        setTokenInput(urlToken.trim().toUpperCase());
+        const clean = urlToken.trim().toUpperCase();
+        const code = clean.replace(/^HUAWEI-?ECA-?/i, '').replace(/^ECA-?/i, '');
+        setTokenCode(code);
+        setTokenInput(clean.startsWith('HUAWEI-ECA-') ? clean : `HUAWEI-ECA-${code}`);
         setStep('configure');
       }
     }
@@ -58,17 +62,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const handleScanSuccess = (scannedToken: string) => {
     setIsScannerOpen(false);
     const cleaned = scannedToken.trim().toUpperCase();
-    setTokenInput(cleaned);
+    const code = cleaned.replace(/^HUAWEI-?ECA-?/i, '').replace(/^ECA-?/i, '');
+    setTokenCode(code);
+    setTokenInput(cleaned.startsWith('HUAWEI-ECA-') ? cleaned : `HUAWEI-ECA-${code}`);
     setErrorMsg(null);
     setStep('configure');
   };
 
   const handleNextToConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tokenInput.trim()) {
-      setErrorMsg('Masukkan Token ID Smartwatch atau scan QR Code.');
+    const cleanCode = tokenCode.trim().toUpperCase();
+    const full = tokenInput.trim() || (cleanCode ? `HUAWEI-ECA-${cleanCode}` : '');
+    if (!full || !cleanCode) {
+      setErrorMsg('Masukkan 4 karakter kode smartwatch atau scan QR Code.');
       return;
     }
+    setTokenInput(full);
     setErrorMsg(null);
     setStep('configure');
   };
@@ -80,11 +89,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       return;
     }
 
+    const cleanCode = tokenCode.trim().toUpperCase();
+    const fullToken = tokenInput.trim().toUpperCase() || (cleanCode ? `HUAWEI-ECA-${cleanCode}` : '');
+    if (!fullToken) {
+      setErrorMsg('Token smartwatch tidak valid.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
       const session = await pairDevice({
-        token: tokenInput.trim().toUpperCase(),
+        token: fullToken,
         patientName: patientName.trim(),
         age: Number(age) || 70,
         gender: gender,
@@ -111,6 +127,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         conditionSummary: 'Hipertensi terkontrol dengan Amlodipine 5mg. Riwayat pusing ringan saat posisi tidur ke berdiri.',
         isDemo: true,
       });
+      setTokenCode('8821');
+      setTokenInput('HUAWEI-ECA-8821');
       onSuccess(session);
       onClose();
     } catch (err: unknown) {
@@ -159,7 +177,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </h2>
                 <p className="text-[11px] text-neutral-400">
                   {step === 'scan'
-                    ? 'Pindai QR Code atau masukkan Token ID jam tangan'
+                    ? 'Pindai QR Code atau masukkan 4 digit kode jam tangan'
                     : 'Lengkapi profil lansia yang akan dipantau'}
                 </p>
               </div>
@@ -216,16 +234,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <form onSubmit={handleNextToConfig} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                      Token ID Smartwatch
+                      Kode Token Smartwatch (4 Karakter)
                     </label>
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={tokenInput}
-                        onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                        placeholder="Contoh: HUAWEI-ECA-XXXX"
-                        className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
-                      />
+                      <div className="flex-1 flex items-stretch border-2 border-neutral-300 focus-within:border-neutral-900 transition-colors bg-white">
+                        <span className="px-3 py-2.5 bg-neutral-100 text-neutral-700 font-mono text-xs font-black border-r-2 border-neutral-300 select-none flex items-center shrink-0">
+                          HUAWEI-ECA-
+                        </span>
+                        <input
+                          type="text"
+                          value={tokenCode}
+                          onChange={(e) => {
+                            let val = e.target.value.toUpperCase().replace(/\s+/g, '');
+                            if (val.startsWith('HUAWEI-ECA-')) val = val.replace('HUAWEI-ECA-', '');
+                            else if (val.startsWith('ECA-')) val = val.replace('ECA-', '');
+                            val = val.replace(/[^A-Z0-9-]/g, '');
+                            setTokenCode(val);
+                            setTokenInput(val ? `HUAWEI-ECA-${val}` : '');
+                          }}
+                          placeholder="2730"
+                          maxLength={8}
+                          className="flex-1 px-3 py-2.5 text-sm font-mono font-black tracking-widest uppercase focus:outline-none placeholder:text-neutral-300"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() => setIsScannerOpen(true)}
@@ -236,7 +267,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       </button>
                     </div>
                     <p className="text-[11px] text-neutral-500">
-                      Token tertera di layar OLED Wokwi atau Serial Monitor.
+                      Cukup masukkan 4 karakter di layar jam tangan (contoh: <strong>2730</strong> atau <strong>FE6B</strong>).
                     </p>
                   </div>
 
@@ -279,7 +310,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     <Watch className="w-4 h-4 text-neutral-700" />
                     <div>
                       <span className="text-[10px] font-bold text-neutral-500 uppercase block">Smartwatch Terdeteksi</span>
-                      <span className="font-mono text-xs font-black text-neutral-900">{tokenInput}</span>
+                      <span className="font-mono text-xs font-black text-neutral-900">
+                        {tokenInput || (tokenCode ? `HUAWEI-ECA-${tokenCode}` : 'HUAWEI-ECA-????')}
+                      </span>
                     </div>
                   </div>
                   <button
