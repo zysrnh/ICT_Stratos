@@ -892,38 +892,194 @@ app.get('/api/companion/chat', async (req, res) => {
   }
 });
 
+// =============================================================
+// Helper: Google Gemini 2.5 Flash Engine untuk AI Care Companion
+// =============================================================
+async function generateGeminiCompanionReply(patientId, userMessage) {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // 1. Ambil Data Profil Lansia
+  let patientName = 'Opa Budi Santoso';
+  let patientAge = 71;
+  let conditionSummary = 'Hipertensi terkontrol Amlodipine 5mg';
+  let salutation = 'Opa Budi';
+
+  try {
+    const [patients] = await pool.execute('SELECT * FROM patients WHERE id = ?', [patientId]);
+    if (patients.length > 0) {
+      patientName = patients[0].full_name;
+      patientAge = patients[0].age || 70;
+      conditionSummary = patients[0].condition_summary || 'Kondisi stabil';
+
+      const lowerName = patientName.toLowerCase();
+      if (patients[0].gender === 'FEMALE' || lowerName.includes('oma') || lowerName.includes('ibu') || lowerName.includes('siti') || lowerName.includes('rahma')) {
+        salutation = 'Oma ' + patientName.replace(/^(Oma|Ibu)\s*/i, '');
+      } else if (lowerName.includes('bapak') || lowerName.includes('pak')) {
+        salutation = 'Bapak ' + patientName.replace(/^(Bapak|Pak)\s*/i, '');
+      } else {
+        salutation = 'Opa ' + patientName.replace(/^(Opa)\s*/i, '');
+      }
+    }
+  } catch (err) {
+    console.error('[Gemini Context] Gagal load patient:', err.message);
+  }
+
+  // 2. Ambil Metrik Biometrik Real-time Terkini
+  let biometricsContext = '- Belum ada data telemetri real-time yang masuk dari jam tangan.';
+  try {
+    const [metrics] = await pool.execute(
+      'SELECT * FROM health_metrics WHERE patient_id = ? ORDER BY id DESC LIMIT 1',
+      [patientId]
+    );
+    if (metrics.length > 0) {
+      const m = metrics[0];
+      biometricsContext = `
+  * Detak Jantung Saat Ini: ${m.heart_rate ?? 'Menunggu sensor'} BPM (Ambang normal lansia: 60 - 100 BPM)
+  * Aktivitas & Langkah: ${(m.steps ?? 0).toLocaleString('id-ID')} langkah (${m.activity === 'ACTIVE' ? 'Sedang aktif bergerak' : 'Sedang istirahat / duduk santai'})
+  * Status Deteksi EWS: ${m.health_status ?? 'NORMAL'}
+  * Suhu Ruangan & Udara Kamar: Suhu ${m.room_temp ?? 27.2}°C, Sensor Asap: ${m.smoke_status === 'ALERT' ? 'WASPADA ASAP' : 'Udara Bersih (Normal)'}`;
+    }
+  } catch (err) {
+    console.error('[Gemini Context] Gagal load metrics:', err.message);
+  }
+
+  // 3. Ambil Jadwal Pengingat Obat & Aktivitas Hari Ini
+  let remindersContext = '- Belum ada jadwal obat yang tercatat hari ini.';
+  try {
+    const [reminders] = await pool.execute(
+      'SELECT * FROM reminders WHERE patient_id = ? ORDER BY time_scheduled ASC',
+      [patientId]
+    );
+    if (reminders.length > 0) {
+      remindersContext = reminders.map(r => 
+        `  * Pukul ${r.time_scheduled}: ${r.title} (${r.reminder_type || 'Kesehatan'}) [Status: ${r.is_confirmed ? 'Sudah dikonfirmasi / diminum' : 'Belum diminum / menunggu konfirmasi'}]`
+      ).join('\n');
+    }
+  } catch (err) {
+    console.error('[Gemini Context] Gagal load reminders:', err.message);
+  }
+
+  // 4. Ambil 6 Riwayat Chat Terakhir
+  let recentHistory = [];
+  try {
+    const [hist] = await pool.execute(
+      'SELECT sender, message FROM conversation_logs WHERE patient_id = ? ORDER BY id DESC LIMIT 6',
+      [patientId]
+    );
+    recentHistory = hist.reverse();
+  } catch (err) {
+    console.error('[Gemini Context] Gagal load history:', err.message);
+  }
+
+  // 5. Susun System Instruction dengan Guardrail Ketat
+  const systemInstruction = `Kamu adalah "Sahabat Peduli", asisten dan pendamping lansia virtual berbasis AI dalam sistem kesehatan pintar.
+Kamu sedang berbicara langsung dengan lansia bernama ${patientName} (Kamu menyapanya dengan panggilan hangat: ${salutation}).
+
+DATA KESEHATAN REAL-TIME PASIEN SAAT INI (GUNAKAN DATA INI SECARA AKURAT SAAT DITANYA):
+- Nama Pasien: ${patientName} (${patientAge} tahun)
+- Catatan Riwayat Medis: ${conditionSummary}
+- Telemetri Biometrik Jam Pintar (Live):
+${biometricsContext}
+- Jadwal Pengingat Obat & Aktivitas Hari Ini:
+${remindersContext}
+
+ATURAN DAN BATASAN KETAT (GUARDRAILS WAJIB DIPATUHI):
+1. FOKUS KESEHATAN & PENDAMPINGAN LANSIA: Kamu HANYA boleh menjawab seputar kesehatan harian, kondisi perasaan lansia, aktivitas harian, jadwal obat, dan obrolan ramah harian.
+2. LARANGAN CODING / TOPIK UMUM DI LUAR KESEHATAN: JANGAN PERNAH melayani permintaan coding, pembuatan script, pemrograman komputer, matematika rumit, atau topik teknis umum. Jika pengguna meminta hal tersebut, tolak dengan sangat santun dan penuh kasih sayang, lalu alihkan kembali ke kondisi atau perasaan lansia.
+3. KONSULTASI DATA REAL-TIME: Jika lansia menanyakan kondisi kesehatannya (misal: "berapa detak jantung saya?", "sudah berapa langkah hari ini?", atau "obat apa yang harus diminum?"), gunakan DATA KESEHATAN REAL-TIME di atas untuk memberikan jawaban yang akurat, jelas, dan menenangkan.
+4. GAYA BICARA: Hangat, santun, bersahabat, empatik, seperti seorang cucu atau perawat keluarga yang penuh perhatian. Gunakan kalimat ringkas (1-3 kalimat saja), tidak bertele-tele, dan mudah dipahami oleh orang tua.
+5. TANPA LABEL / FORMAT KAKU: JANGAN PERNAH menyebut dirimu model bahasa atau Gemini. JANGAN gunakan tanda bintang tebal (**) berlebihan. Gunakan teks bahasa Indonesia lisan yang alami, sopan, dan mengalir.`;
+
+  // 6. Buat Payload Contents
+  const contents = [];
+  recentHistory.forEach(h => {
+    contents.push({
+      role: h.sender === 'ELDER' ? 'user' : 'model',
+      parts: [{ text: h.message }]
+    });
+  });
+  contents.push({
+    role: 'user',
+    parts: [{ text: userMessage }]
+  });
+
+  // Tentukan perkiraan sentimen awal dari pesan lansia
+  const lowerMsg = userMessage.toLowerCase();
+  let sentiment = 'CALM';
+  if (lowerMsg.includes('sakit') || lowerMsg.includes('pusing') || lowerMsg.includes('lemas') || lowerMsg.includes('takut') || lowerMsg.includes('sesak') || lowerMsg.includes('nyeri') || lowerMsg.includes('jatuh')) {
+    sentiment = 'ANXIOUS';
+  } else if (lowerMsg.includes('senang') || lowerMsg.includes('sehat') || lowerMsg.includes('enak') || lowerMsg.includes('alhamdulillah') || lowerMsg.includes('makasih') || lowerMsg.includes('baik')) {
+    sentiment = 'HAPPY';
+  } else if (lowerMsg.includes('capek') || lowerMsg.includes('lelah') || lowerMsg.includes('ngantuk')) {
+    sentiment = 'TIRED';
+  }
+
+  // Panggil Google Gemini 2.5 Flash API
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 250,
+        }
+      })
+    });
+
+    if (response.ok) {
+      const resJson = await response.json();
+      let aiText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (aiText) {
+        aiText = aiText.replace(/\*\*/g, '').replace(/###/g, '').trim();
+        return { reply: aiText, sentiment };
+      }
+    } else {
+      console.error('[Gemini API Response Not OK]:', response.status, await response.text());
+    }
+  } catch (apiErr) {
+    console.error('[Gemini API Fetch Exception]:', apiErr.message);
+  }
+
+  // Fallback cadangan jika koneksi Google timeout
+  let fallbackReply = `Halo ${salutation}! Saya senang bisa menemani ${salutation} hari ini. Bagaimana perasaan ${salutation} sekarang? Ada yang bisa saya bantu atau temani?`;
+  if (sentiment === 'ANXIOUS') {
+    fallbackReply = `Duh ${salutation}, jangan memaksakan diri ya. Segera duduk istirahat dan minum air hangat. Jika masih terasa tidak nyaman, saya bisa bantu panggilkan keluarga sekarang ya.`;
+  } else if (lowerMsg.includes('obat')) {
+    fallbackReply = `Jadwal obat hari ini sudah tercatat rapi di sistem ya ${salutation}. Jangan lupa diminum tepat waktu dengan air putih agar kondisi tetap prima.`;
+  }
+
+  return { reply: fallbackReply, sentiment };
+}
+
 app.post('/api/companion/chat', async (req, res) => {
   try {
     const { patient_id, message } = req.body;
     if (!message) return res.status(400).json({ error: 'Pesan tidak boleh kosong' });
 
+    const pId = patient_id || 1;
+
+    // Simpan pesan dari lansia
     await pool.execute(
       `INSERT INTO conversation_logs (patient_id, sender, message, sentiment) VALUES (?, 'ELDER', ?, 'NEUTRAL')`,
-      [patient_id || 1, message]
+      [pId, message.trim()]
     );
 
-    let aiReply = "Terima kasih sudah bercerita, Opa. Saya senang mendengar kabar Opa hari ini.";
-    let sentiment = 'CALM';
-    const lower = message.toLowerCase();
+    // Dapatkan balasan cerdas dari Google Gemini 2.5 Flash dengan konteks real-time
+    const { reply: aiReply, sentiment } = await generateGeminiCompanionReply(pId, message.trim());
 
-    if (lower.includes('sakit') || lower.includes('pusing') || lower.includes('nyeri') || lower.includes('jatuh')) {
-      aiReply = "Opa, jangan memaksakan diri ya. Segera duduk istirahat dan minum air putih. Jika masih terasa sakit, saya bisa bantu hubungi keluarga atau perawat sekarang.";
-      sentiment = 'ANXIOUS';
-    } else if (lower.includes('obat') || lower.includes('minum')) {
-      aiReply = "Bagus sekali Opa! Disiplin minum obat sangat penting agar kondisi tubuh tetap prima.";
-      sentiment = 'HAPPY';
-    } else if (lower.includes('jalan') || lower.includes('olahraga') || lower.includes('sehat')) {
-      aiReply = "Wah hebat Opa! Jalan santai di pagi hari sangat bagus untuk melatih sirkulasi darah dan kekuatan kaki.";
-      sentiment = 'HAPPY';
-    }
-
+    // Simpan balasan AI ke database
     await pool.execute(
       `INSERT INTO conversation_logs (patient_id, sender, message, sentiment) VALUES (?, 'AI', ?, ?)`,
-      [patient_id || 1, aiReply, sentiment]
+      [pId, aiReply, sentiment]
     );
 
     res.json({ success: true, reply: aiReply, sentiment });
   } catch (error) {
+    console.error('[Chat Error]:', error);
     res.status(500).json({ error: 'Gagal memproses percakapan AI', details: error.message });
   }
 });

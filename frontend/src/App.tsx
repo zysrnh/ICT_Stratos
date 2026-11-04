@@ -180,7 +180,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Tab 3: AI Companionship & Reminders */}
-        {activeTab === 'companion' && <AiCompanionView />}
+        {activeTab === 'companion' && <AiCompanionView session={session} />}
 
         {/* Tab 4: Family Connection & UU PDP Consent */}
         {activeTab === 'family' && <FamilyPrivacyView />}
