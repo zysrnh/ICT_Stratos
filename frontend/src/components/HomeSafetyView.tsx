@@ -175,7 +175,7 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
         </div>
       </div>
 
-      {/* 3. Log Riwayat Kejadian Darurat (Juknis 6.1) */}
+      {/* 3. Log Riwayat Kejadian Darurat */}
       <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-[#111111]">Riwayat Kejadian & Siklus Eskalasi</h3>

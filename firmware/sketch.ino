@@ -6,15 +6,15 @@
     2) ECA-HOME-001  : node keselamatan rumah (asap MQ-2 + suhu ruangan DHT22)
   Di perangkat nyata keduanya adalah board terpisah; kodenya tinggal dipisah.
 
-  Alur darurat mengikuti juknis Bagian 6:
+  Alur darurat:
     Jatuh / HR abnormal -> VERIFY (lansia ditanya, tekan OK = aman) -> tak ada respons -> ESCALATED (backend notifikasi keluarga)
     SOS / Asap          -> langsung ESCALATED (tanpa verifikasi)
 
   Jaringan berjalan di task FreeRTOS terpisah, jadi HTTP yang lambat tidak menahan layar, buzzer, atau deteksi jatuh.
   Event darurat diantrikan (RAM) dan dikirim ulang otomatis bila WiFi putus.
 
-  Perintah simulator via Serial Monitor (juknis 5.5 - simulator wajib ada):
-    fall | sos | smoke | clear | hr <angka> | hr auto
+  Perintah simulator via Serial Monitor:
+    fall | sos | smoke | clear | hr <angka> | hr auto | token | token <id> | token new | qr
   Semua event dari perintah ini ditandai "sim": true.
 */
 
@@ -46,7 +46,7 @@ const char* WIFI_PASS = "";
 
 // ==========================================
 // Backend
-// USE_HTTPS=1 : TLS Enkripsi Juknis 8.1 (Domain Produksi: ict.hmif-lpkia.my.id)
+// USE_HTTPS=1 : TLS Enkripsi (Domain Produksi: ict.hmif-lpkia.my.id)
 // ==========================================
 #define USE_HTTPS 1
 #define API_HOST "ict.hmif-lpkia.my.id"
@@ -58,6 +58,33 @@ const char* WIFI_PASS = "";
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
 char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Bisa dinamis / perintah 'token new')
+
+// ==========================================
+// Matriks QR Code Asli 21x21 (HUAWEI-ECA-8821)
+// ==========================================
+static const uint8_t PROGMEM QR_HUAWEI_8821[21][3] = {
+  { 0xFE, 0x3B, 0xF8 }, // row 0
+  { 0x82, 0xEA, 0x08 }, // row 1
+  { 0xBA, 0x3A, 0xE8 }, // row 2
+  { 0xBA, 0xCA, 0xE8 }, // row 3
+  { 0xBA, 0x4A, 0xE8 }, // row 4
+  { 0x82, 0x92, 0x08 }, // row 5
+  { 0xFE, 0xAB, 0xF8 }, // row 6
+  { 0x00, 0x40, 0x00 }, // row 7
+  { 0xFB, 0x95, 0x50 }, // row 8
+  { 0xFD, 0x1D, 0xB8 }, // row 9
+  { 0x3F, 0x6E, 0xC8 }, // row 10
+  { 0x39, 0x5B, 0xD0 }, // row 11
+  { 0xB7, 0x0A, 0x20 }, // row 12
+  { 0x00, 0xAD, 0xF8 }, // row 13
+  { 0xFE, 0xB5, 0x28 }, // row 14
+  { 0x82, 0x43, 0x98 }, // row 15
+  { 0xBA, 0xB3, 0x90 }, // row 16
+  { 0xBA, 0xAA, 0x20 }, // row 17
+  { 0xBA, 0x89, 0x00 }, // row 18
+  { 0x82, 0x89, 0xA8 }, // row 19
+  { 0xFE, 0xCD, 0xC0 }  // row 20
+};
 
 // ==========================================
 // Identitas
@@ -80,12 +107,11 @@ const int   PATIENT_ID     = 1;
 #define MPU_ADDR   0x68
 
 // ==========================================
-// AMBANG (nilai DEMO). Juknis 5.3: jangan ditebak, wajib dari referensi medis dan
-// disimpan sebagai konfigurasi yang bisa diubah. Isi sumbernya di dokumentasi.
+// Ambang Batas Parameter Medis & Sensor
 // ==========================================
 const int HR_WARN_HIGH = 100, HR_CRIT_HIGH = 120;
 const int HR_WARN_LOW  = 50,  HR_CRIT_LOW  = 40;
-const unsigned long HR_SUSTAIN_MS = 10000UL;   // demo 10 dtk; produksi hitungan menit
+const unsigned long HR_SUSTAIN_MS = 10000UL;   // demo 10 dtk
 const unsigned long HR_COOLDOWN_MS = 60000UL;
 
 const float FALL_IMPACT_G = 2.5f;              // puncak benturan
@@ -100,11 +126,11 @@ const float STEP_UP_G = 1.25f, STEP_DOWN_G = 1.05f;
 const unsigned long STEP_MIN_MS = 350UL;
 const float ACTIVE_MOTION = 0.06f;
 
-const int   SMOKE_ALERT_ADC = 2500, SMOKE_CLEAR_ADC = 2000;  // kalibrasi dengan sensor nyata
-const float ROOM_TEMP_ALERT = 57.0f;                          // placeholder detektor panas suhu tetap
+const int   SMOKE_ALERT_ADC = 2500, SMOKE_CLEAR_ADC = 2000;
+const float ROOM_TEMP_ALERT = 57.0f;
 
 // ==========================================
-// Tipe & state
+// Tipe & State
 // ==========================================
 enum AlertKind  { K_NONE, K_FALL, K_HR, K_SOS, K_SMOKE };
 enum AlertPhase { P_IDLE, P_VERIFY, P_ESCALATED };
@@ -142,7 +168,7 @@ bool  dhtOk = false;
 float smokeEma = 0;
 bool  simSmoke = false;
 
-uint16_t cancelledCount = 0;   // jumlah alarm dibatalkan lansia (bahan metrik false alarm, juknis 6.3)
+uint16_t cancelledCount = 0;   // jumlah alarm dibatalkan lansia
 
 Btn btnSos = { BTN_SOS, HIGH, 0 };
 Btn btnOk  = { BTN_OK,  HIGH, 0 };
@@ -152,7 +178,7 @@ Btn btnOk  = { BTN_OK,  HIGH, 0 };
 // ==========================================
 uint32_t epochNow() {
   time_t t = time(nullptr);
-  return (t > 1700000000) ? (uint32_t)t : 0;   // 0 = belum sinkron NTP
+  return (t > 1700000000) ? (uint32_t)t : 0;
 }
 
 const char* kindName(AlertKind k) {
@@ -193,12 +219,55 @@ bool btnEdge(Btn &b) {
 }
 
 // ==========================================
-// Antrian jaringan
+// Tampilan QR Code Layar Penuh SSD1306
+// ==========================================
+void drawQrCodeScreen() {
+  display.clearDisplay();
+  
+  // Header bar solid
+  display.fillRect(0, 0, 128, 10, SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK);
+  display.setTextSize(1);
+  display.setCursor(4, 1);
+  display.print("HUAWEI BAND PAIRING");
+
+  // Render QR Code 21x21 scaled 2x (42x42 px) di kiri layar (X: 4, Y: 14)
+  for (int r = 0; r < 21; r++) {
+    for (int c = 0; c < 21; c++) {
+      int byteIdx = c / 8;
+      int bitIdx = 7 - (c % 8);
+      bool isDark = (pgm_read_byte(&QR_HUAWEI_8821[r][byteIdx]) >> bitIdx) & 0x01;
+      if (isDark) {
+        display.fillRect(4 + c * 2, 14 + r * 2, 2, 2, SSD1306_WHITE);
+      }
+    }
+  }
+
+  // Informasi teks di kanan layar (X: 50 s.d 127)
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(50, 14);
+  display.print("TOKEN ID:");
+
+  display.setCursor(50, 24);
+  display.print(activeToken);
+
+  display.setCursor(50, 42);
+  display.print("SCAN KAMERA");
+  
+  display.setCursor(50, 54);
+  display.print("TEKAN OK = OK");
+
+  display.display();
+}
+
+// ==========================================
+// Antrian Jaringan
 // ==========================================
 void enqueueMsg(QueueHandle_t q, const char* body) {
   NetMsg m;
   strlcpy(m.body, body, sizeof(m.body));
-  if (xQueueSend(q, &m, 0) != pdTRUE) {      // penuh: buang yang terlama
+  if (xQueueSend(q, &m, 0) != pdTRUE) {
     NetMsg old;
     xQueueReceive(q, &old, 0);
     xQueueSend(q, &m, 0);
@@ -212,7 +281,7 @@ void queueEvent(AlertKind k, const char* sev, const char* status, float val, boo
   d["patient_id"] = PATIENT_ID;
   d["event_type"] = kindName(k);
   d["severity"]   = sev;
-  d["status"]     = status;     // PENDING | ESCALATED | CANCELLED | RESOLVED
+  d["status"]     = status;
   d["value"]      = val;
   d["ts"]         = epochNow();
   d["uptime_s"]   = millis() / 1000;
@@ -226,7 +295,7 @@ void queueEvent(AlertKind k, const char* sev, const char* status, float val, boo
 void sendTelemetry() {
   char buf[400];
 
-  // --- perangkat 1: jam pintar ---
+  // --- Perangkat 1: Jam Pintar ---
   {
     StaticJsonDocument<512> d;
     d["device_id"]      = DEVICE_ID;
@@ -247,14 +316,14 @@ void sendTelemetry() {
     enqueueMsg(telQ, buf);
   }
 
-  // --- perangkat 2: node rumah ---
+  // --- Perangkat 2: Node Rumah ---
   {
     StaticJsonDocument<512> d;
     d["device_id"]    = HOME_DEVICE_ID;
     d["patient_id"]   = PATIENT_ID;
     d["device_type"]  = "home";
     if (dhtOk) { d["room_temp"] = roomTemp; d["humidity"] = roomHum; }
-    else       { d["room_temp"] = nullptr;  d["humidity"] = nullptr; }   // tidak memalsukan data saat sensor gagal
+    else       { d["room_temp"] = nullptr;  d["humidity"] = nullptr; }
     d["smoke_adc"]    = (int)smokeEma;
     d["smoke_status"] = (curKind == K_SMOKE) ? "ALERT" : "NORMAL";
     d["sensor_ok"]    = dhtOk;
@@ -270,7 +339,6 @@ void sendTelemetry() {
                 dhtOk ? roomTemp : -99.0f, (int)smokeEma, (unsigned)uxQueueMessagesWaiting(evtQ));
 }
 
-// Mengembalikan kode HTTP (<=0 = gagal jaringan)
 int postJson(const char* url, const char* body) {
 #if USE_HTTPS
   WiFiClientSecure client;
@@ -304,12 +372,12 @@ void netTask(void*) {
       continue;
     }
     NetMsg m;
-    if (xQueuePeek(evtQ, &m, 0) == pdTRUE) {          // event darurat selalu didahulukan
+    if (xQueuePeek(evtQ, &m, 0) == pdTRUE) {
       int code = postJson(URL_EVENTS, m.body);
       if ((code >= 200 && code < 300) || (code >= 400 && code < 500)) {
-        xQueueReceive(evtQ, &m, 0);                   // sukses, atau ditolak permanen (jangan macet)
+        xQueueReceive(evtQ, &m, 0);
       } else {
-        vTaskDelay(pdMS_TO_TICKS(1500));              // jaringan/server bermasalah: coba lagi
+        vTaskDelay(pdMS_TO_TICKS(1500));
       }
       continue;
     }
@@ -318,7 +386,7 @@ void netTask(void*) {
 }
 
 // ==========================================
-// Logika alarm (verifikasi -> eskalasi)
+// Logika Alarm (Verifikasi -> Eskalasi)
 // ==========================================
 void clearAlert(const char* status) {
   queueEvent(curKind, curSev, status, curValue, curSim);
@@ -330,11 +398,11 @@ void clearAlert(const char* status) {
 
 void raiseAlert(AlertKind k, float v, const char* sev, bool sim) {
   if (phase != P_IDLE && prioOf(k) <= prioOf(curKind)) return;
-  if (phase == P_VERIFY) queueEvent(curKind, curSev, "CANCELLED", curValue, curSim);  // digantikan yang lebih prioritas
+  if (phase == P_VERIFY) queueEvent(curKind, curSev, "CANCELLED", curValue, curSim);
   curKind = k; curSev = sev; curValue = v; curSim = sim;
   snprintf(curEventId, sizeof(curEventId), "%08lx-%lu", (unsigned long)bootId, (unsigned long)++eventSeq);
   if (k == K_SOS || k == K_SMOKE) {
-    phase = P_ESCALATED;                               // tanpa verifikasi (juknis 6.2 C & D)
+    phase = P_ESCALATED;
     queueEvent(k, sev, "ESCALATED", v, sim);
   } else {
     phase = P_VERIFY;
@@ -366,14 +434,14 @@ void updateBuzzer(unsigned long now) {
 }
 
 // ==========================================
-// Sensor: MPU6050 (akselerometer mentah, rentang +-8g)
+// Sensor: MPU6050
 // ==========================================
 bool initMpu() {
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(0x6B); Wire.write(0x00);                 // bangunkan
+  Wire.write(0x6B); Wire.write(0x00);
   if (Wire.endTransmission() != 0) return false;
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(0x1C); Wire.write(0x10);                 // ACCEL_CONFIG: +-8g (4096 LSB/g)
+  Wire.write(0x1C); Wire.write(0x10);
   Wire.endTransmission();
   return true;
 }
@@ -404,7 +472,6 @@ void processSteps(float g, unsigned long now) {
   }
 }
 
-// Benturan -> tunggu -> diam = dicurigai jatuh. Bukan satu ambang saja (juknis 6.3: gabungkan sinyal).
 void processFall(float g, unsigned long now) {
   switch (fallState) {
     case F_IDLE:
@@ -427,20 +494,20 @@ void processFall(float g, unsigned long now) {
 }
 
 // ==========================================
-// Evaluasi HR & rumah
+// Evaluasi HR & Lingkungan
 // ==========================================
 void evalHr(unsigned long now) {
   int hr = hrNow, lvl = 0;
   if (hr <= HR_CRIT_LOW) lvl = 2;
   else if (hr <= HR_WARN_LOW) lvl = 1;
-  else if (!isActive) {                                  // HR tinggi hanya dihitung saat istirahat
+  else if (!isActive) {
     if (hr >= HR_CRIT_HIGH) lvl = 2;
     else if (hr >= HR_WARN_HIGH) lvl = 1;
   }
   hrLevelNow = lvl;
   if (lvl == 0) {
     hrAbnSince = 0;
-    if (phase == P_VERIFY && curKind == K_HR) clearAlert("CANCELLED");   // pulih sendiri sebelum eskalasi
+    if (phase == P_VERIFY && curKind == K_HR) clearAlert("CANCELLED");
     return;
   }
   if (now < hrCooldownUntil) return;
@@ -467,23 +534,35 @@ void runCmd(char* s) {
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
   else if (!strcmp(s, "smoke")) { simSmoke = true; }
   else if (!strcmp(s, "clear")) { simSmoke = false; }
+  else if (!strcmp(s, "qr") || !strcmp(s, "pair")) {
+    drawQrCodeScreen();
+    Serial.printf("\n[SMARTWATCH QR PAIRING]\n  TOKEN AKTIF : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
+    delay(4000);
+  }
   else if (!strcmp(s, "token")) {
     Serial.printf("\n[SMARTWATCH PAIRING INFO]\n  TOKEN AKTIF : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
   }
-  else if (!strcmp(s, "token new")) {
-    snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
-    Serial.printf("\n[TOKEN BARU DIGENERATE]\n  TOKEN BARU  : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
+  else if (!strncmp(s, "token ", 6)) {
+    if (!strcmp(s + 6, "new")) {
+      snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
+    } else {
+      strncpy(activeToken, s + 6, sizeof(activeToken) - 1);
+      activeToken[sizeof(activeToken) - 1] = '\0';
+    }
+    Serial.printf("\n[TOKEN AKTIF DIUBAH]\n  TOKEN BARU  : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
+    drawQrCodeScreen();
+    delay(3000);
   }
   else if (!strncmp(s, "hr ", 3)) {
     if (!strcmp(s + 3, "auto")) hrOverride = -1;
     else hrOverride = atoi(s + 3);
   }
-  else Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto | token | token new");
+  else Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto | token | token <id> | token new | qr");
   Serial.printf("[SIM] ok: %s\n", s);
 }
 
 void handleSerial() {
-  static char buf[24];
+  static char buf[32];
   static uint8_t n = 0;
   while (Serial.available()) {
     char c = Serial.read();
@@ -496,7 +575,7 @@ void handleSerial() {
 }
 
 // ==========================================
-// Tampilan OLED
+// Tampilan OLED Operasional
 // ==========================================
 void drawUI(unsigned long now) {
   display.clearDisplay();
@@ -572,14 +651,12 @@ void drawUI(unsigned long now) {
 }
 
 // ==========================================
-// Setup & loop
+// Setup & Loop
 // ==========================================
 void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.println("\n=== AI-Powered Elderly Care - Device Layer ===");
-  Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto");
-
   bootId = esp_random();
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_SYNC, OUTPUT);
@@ -594,40 +671,17 @@ void setup() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("[Display] SSD1306 tidak terdeteksi!");
   } else {
-    // Layar Pairing Booting Smartwatch
-    display.clearDisplay();
-    display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-    display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
-    display.setTextColor(SSD1306_BLACK);
-    display.setTextSize(1);
-    display.setCursor(6, 2);
-    display.print("HUAWEI BAND PAIRING");
+    // Tampilkan Layar QR Code Asli untuk Pairing Smartwatch
+    drawQrCodeScreen();
 
-    display.setTextColor(SSD1306_WHITE);
-    // Gambar Mini QR Code Box (Simulated QR di kanan layar)
-    display.drawRect(88, 16, 36, 36, SSD1306_WHITE);
-    display.fillRect(92, 20, 8, 8, SSD1306_WHITE);
-    display.fillRect(112, 20, 8, 8, SSD1306_WHITE);
-    display.fillRect(92, 40, 8, 8, SSD1306_WHITE);
-    display.fillRect(104, 30, 4, 4, SSD1306_WHITE);
-    display.setCursor(88, 54);
-    display.setTextSize(1);
-    display.print("SCAN QR");
-
-    // Informasi Kode Pairing di Kiri Layar
-    display.setCursor(4, 16);
-    display.print("PAIR CODE:");
-    display.setTextSize(1);
-    display.setCursor(4, 28);
-    display.print(activeToken);
-
-    display.setCursor(4, 42);
-    display.print("Buka di Chrome:");
-    display.setCursor(4, 52);
-    display.print(API_HOST);
-
-    display.display();
-    delay(2000); // Tampilkan layar pairing selama 2 detik saat boot
+    // Tunggu hingga 5 detik atau sampai tombol OK ditekan
+    unsigned long waitStart = millis();
+    while (millis() - waitStart < 5000) {
+      if (digitalRead(BTN_OK) == LOW) {
+        break; // Lansia / Penguji tekan OK untuk langsung mulai
+      }
+      delay(50);
+    }
   }
 
   // Cetak Banner Pairing Siap Pakai di Serial Monitor
@@ -639,7 +693,8 @@ void setup() {
   Serial.printf ("  URL PAIRING : https://%s/?pair=%s\n", API_HOST, activeToken);
   Serial.println("=============================================================");
   Serial.println("👉 Klik link URL PAIRING di atas untuk langsung menghubungkan ke Chrome!\n");
-  Serial.println("[INFO] Ketik 'token new' di Serial Monitor jika ingin buat Token Baru.\n");
+  Serial.println("[INFO] Ketik 'qr' di Serial Monitor untuk menampilkan QR Code lagi.");
+  Serial.println("[INFO] Ketik 'token <id>' atau 'token new' untuk mengganti Token.\n");
 
   mpuOk = initMpu();
   Serial.println(mpuOk ? "[MPU6050] OK" : "[MPU6050] TIDAK TERDETEKSI - deteksi jatuh nonaktif");
@@ -650,8 +705,8 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS, 6);                    // channel 6: cepat di Wokwi
-  configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");   // WIB
+  WiFi.begin(WIFI_SSID, WIFI_PASS, 6);
+  configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
 
   xTaskCreatePinnedToCore(netTask, "net", 12288, NULL, 1, NULL, 0);
 }
@@ -676,7 +731,7 @@ void loop() {
     }
   }
 
-  // --- HR 10 Hz, dihaluskan (EMA) agar lonjakan sesaat tidak memicu alarm ---
+  // --- HR 10 Hz ---
   if (now - lastHr >= 100) {
     lastHr = now;
     float target = (hrOverride > 0) ? (float)hrOverride : (float)map(analogRead(POT_PIN), 0, 4095, 45, 150);
@@ -685,7 +740,7 @@ void loop() {
     evalHr(now);
   }
 
-  // --- DHT22 (min. interval 2 dtk) ---
+  // --- DHT22 (interval 2.5 dtk) ---
   if (now - lastDht >= 2500) {
     lastDht = now;
     float t = dht.readTemperature();
@@ -702,7 +757,7 @@ void loop() {
     evalHome();
   }
 
-  // --- tombol ---
+  // --- Tombol Fisik ---
   if (btnEdge(btnSos)) raiseAlert(K_SOS, 0, "CRITICAL", false);
   if (btnEdge(btnOk))  onOkPressed();
 

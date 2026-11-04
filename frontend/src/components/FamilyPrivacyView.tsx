@@ -41,7 +41,7 @@ export const FamilyPrivacyView: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Kolom Kiri: Profil Lansia & Kontak Darurat Bertingkat (Juknis 2.4 & 6.1) */}
+      {/* Kolom Kiri: Profil Lansia & Kontak Darurat Bertingkat */}
       <div className="lg:col-span-6 space-y-6">
         {/* Kartu Profil Lansia */}
         <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
@@ -121,7 +121,7 @@ export const FamilyPrivacyView: React.FC = () => {
         </div>
       </div>
 
-      {/* Kolom Kanan: Kepatuhan Privasi & Consent UU PDP No. 27/2022 (Juknis 8) */}
+      {/* Kolom Kanan: Kepatuhan Privasi & Consent UU PDP No. 27/2022 */}
       <div className="lg:col-span-6 space-y-6">
         <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-4">

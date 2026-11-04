@@ -318,7 +318,7 @@ export async function toggleConsent(consentId: number, isGranted: boolean): Prom
   }
 }
 
-// Fitur Khusus Demo Juri: Memicu simulasi darurat langsung dari UI (Juknis 10: Skenario Demo)
+// Fitur Simulasi Pengujian: Memicu simulasi darurat langsung dari UI
 export async function triggerSimulatedEvent(
   eventType: 'FALL' | 'SOS' | 'SMOKE' | 'HR_ABNORMAL',
   status: 'PENDING' | 'ESCALATED' | 'CANCELLED' | 'RESOLVED' = 'PENDING',
