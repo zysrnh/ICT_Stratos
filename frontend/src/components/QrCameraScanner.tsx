@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Upload, X, AlertCircle, RefreshCw } from 'lucide-react';
+import { Upload, X, AlertCircle, RefreshCw, SwitchCamera } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -28,8 +28,9 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   const [cameraActive, setCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
-  // Parse QR content (bisa berupa teks langsung 'HUAWEI-ECA-8821' atau URL 'https://...?pair=HUAWEI-ECA-8821')
+  // Parse QR content (bisa berupa teks token murni atau URL 'https://...?pair=...')
   const parseTokenFromRaw = (raw: string): string => {
     const text = raw.trim();
     if (text.includes('?')) {
@@ -53,7 +54,13 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
     setCameraActive(false);
   };
 
-  // Inisialisasi Kamera saat modal dibuka
+  // Toggle antara Kamera Belakang (environment) dan Kamera Depan (user)
+  const toggleFacingMode = () => {
+    stopCamera();
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+  };
+
+  // Inisialisasi Kamera saat modal dibuka atau facingMode berubah
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
@@ -65,13 +72,18 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
 
     const startCamera = async () => {
       setErrorMsg(null);
+      setCameraActive(false);
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Browser Anda tidak mendukung akses kamera secara langsung.');
+          throw new Error('Browser tidak mendukung akses kamera langsung.');
         }
 
         localStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } },
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
           audio: false,
         });
 
@@ -91,8 +103,8 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
           const msg = err instanceof Error ? err.message : 'Kamera tidak dapat diakses.';
           setErrorMsg(
             msg.includes('NotAllowedError') || msg.includes('Permission')
-              ? 'Izin kamera ditolak. Izinkan browser mengakses kamera, atau gunakan fitur upload foto/screenshot di bawah.'
-              : `Gagal membuka kamera (${msg}). Anda bisa unggah foto screenshot QR.`
+              ? 'Izin kamera ditolak. Silakan izinkan browser atau unggah screenshot gambar QR.'
+              : `Gagal membuka kamera (${msg}). Anda bisa unggah gambar screenshot QR di bawah.`
           );
         }
       }
@@ -106,7 +118,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
         localStream.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [isOpen]);
+  }, [isOpen, facingMode]);
 
   // Loop Scanning Real-time dari Video Stream
   useEffect(() => {
@@ -129,7 +141,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
       const canvas = canvasRef.current;
 
       if (video && video.readyState >= 2 && canvas) {
-        // Cek pakai BarcodeDetector native (Chrome Android / Desktop)
+        // 1. Coba BarcodeDetector native (Chrome Android & Desktop)
         if (barcodeDetectorInstance) {
           try {
             const barcodes = await barcodeDetectorInstance.detect(video);
@@ -146,7 +158,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
           }
         }
 
-        // Fallback pakai jsQR via Canvas
+        // 2. Fallback jsQR via Canvas
         if (window.jsQR) {
           const ctx = canvas.getContext('2d');
           if (ctx) {
@@ -221,7 +233,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
           }
         }
 
-        setErrorMsg('QR Code tidak terdeteksi dalam gambar ini. Pastikan gambar jelas dan tidak buram.');
+        setErrorMsg('QR Code tidak terdeteksi dalam file ini. Pastikan gambar jelas dan tidak buram.');
       };
       img.src = reader.result as string;
     };
@@ -231,23 +243,43 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fadeIn select-none">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fadeIn select-none font-sans">
       <div className="bg-white border-2 border-neutral-900 w-full max-w-sm rounded-none shadow-2xl overflow-hidden flex flex-col">
-        {/* Header Flat Solid Monochrome */}
+        {/* Header - Flat Solid Monochrome */}
         <div className="bg-neutral-900 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Camera className="w-4 h-4 text-white" />
-            <span className="font-bold text-xs uppercase tracking-wider">Scan QR Jam Tangan</span>
+            <div className="w-6 h-6 bg-white text-neutral-900 flex items-center justify-center font-black text-xs">
+              QR
+            </div>
+            <span className="font-bold text-xs uppercase tracking-wider">Pemindai Kamera Smartwatch</span>
           </div>
-          <button
-            onClick={() => {
-              stopCamera();
-              onClose();
-            }}
-            className="text-neutral-400 hover:text-white cursor-pointer p-1"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-1">
+            {/* Tombol Ganti Kamera (Depan / Belakang) */}
+            <button
+              type="button"
+              onClick={toggleFacingMode}
+              title={`Beralih ke Kamera ${facingMode === 'environment' ? 'Depan' : 'Belakang'}`}
+              className="p-1.5 text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+            >
+              <SwitchCamera className="w-4 h-4" />
+              <span className="hidden sm:inline font-bold">
+                {facingMode === 'environment' ? 'Kamera Depan' : 'Kamera Belakang'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                stopCamera();
+                onClose();
+              }}
+              className="text-neutral-400 hover:text-white cursor-pointer p-1.5"
+              title="Tutup Pemindai"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Viewport Scanner */}
@@ -259,7 +291,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
             </div>
           ) : (
             <p className="text-[11px] text-neutral-600 mb-3 text-center">
-              Arahkan kamera ke layar jam tangan Wokwi yang menampilkan QR Code.
+              Arahkan ke QR Code di layar jam Wokwi. Mode: <strong>{facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan (Selfie/Webcam)'}</strong>.
             </p>
           )}
 
@@ -267,16 +299,17 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
           <div className="relative w-64 h-64 bg-black border-2 border-neutral-900 flex items-center justify-center overflow-hidden">
             <video
               ref={videoRef}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
               playsInline
               muted
             />
+
             {/* Target Reticle Box */}
             <div className="absolute inset-8 border-2 border-dashed border-emerald-400 pointer-events-none flex items-center justify-center">
-              <div className="w-2 h-2 bg-emerald-400"></div>
+              <div className="w-2.5 h-2.5 bg-emerald-400"></div>
             </div>
 
-            {/* Scanning line animation */}
+            {/* Scanning Line Animation */}
             {cameraActive && (
               <div className="absolute inset-x-8 top-8 h-0.5 bg-emerald-400 shadow-[0_0_8px_#34d399] animate-bounce pointer-events-none" />
             )}
@@ -291,8 +324,20 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({
 
           <canvas ref={canvasRef} className="hidden" />
 
+          {/* Tombol Cepat Ganti Kamera */}
+          <div className="mt-3 flex gap-2 w-full">
+            <button
+              type="button"
+              onClick={toggleFacingMode}
+              className="flex-1 py-1.5 px-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-400 text-neutral-800 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <SwitchCamera className="w-3.5 h-3.5" />
+              <span>Ganti ke {facingMode === 'environment' ? 'Kamera Depan' : 'Kamera Belakang'}</span>
+            </button>
+          </div>
+
           {/* Fallback Upload Gambar Screenshot */}
-          <div className="mt-4 w-full pt-3 border-t border-neutral-200">
+          <div className="mt-3 w-full pt-3 border-t border-neutral-200">
             <span className="text-[10px] font-bold text-neutral-500 uppercase block mb-1 text-center">
               Atau Unggah Screenshot / File Gambar:
             </span>

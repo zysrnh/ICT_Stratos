@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Watch, KeyRound, UserPlus, LogIn, X, CheckCircle2, ShieldCheck, AlertCircle, Camera, QrCode } from 'lucide-react';
-import { loginAuth, pairDevice, registerDevice } from '../services/api';
+import { X, CheckCircle2, ShieldCheck, AlertCircle, Camera, QrCode, ArrowRight } from 'lucide-react';
+import { pairDevice } from '../services/api';
 import type { AuthSession } from '../types/telemetry';
 import { QrCameraScanner } from './QrCameraScanner';
 
@@ -19,21 +19,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   currentSession,
   isFullScreen = false,
 }) => {
-  const [tab, setTab] = useState<'PAIR' | 'REGISTER' | 'LOGIN'>('PAIR');
   const [tokenInput, setTokenInput] = useState('');
   const [patientName, setPatientName] = useState('');
-  const [username, setUsername] = useState('rully');
-  const [password, setPassword] = useState('demo123');
-
-  // Form Register Mandiri
-  const [regToken, setRegToken] = useState(`ECA-${Math.floor(1000 + Math.random() * 9000)}`);
-  const [regName, setRegName] = useState('');
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  // Auto-detect token dari URL parameter (?pair=... atau ?token=...)
+  // Auto-detect token dari parameter URL (?pair=... atau ?token=...)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -63,7 +55,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const handlePairSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tokenInput.trim()) {
-      setErrorMsg('Masukkan Token ID Jam Tangan.');
+      setErrorMsg('Masukkan Token ID Jam Tangan atau pindai QR Code.');
       return;
     }
     await triggerPair(tokenInput, patientName);
@@ -79,71 +71,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     await triggerPair('HUAWEI-ECA-8821', 'Opa Budi Santoso');
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regToken.trim() || !regName.trim()) {
-      setErrorMsg('ID Token dan Nama Lansia wajib diisi.');
-      return;
-    }
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const session = await registerDevice({
-        device_token: regToken.trim().toUpperCase(),
-        patient_name: regName.trim(),
-      });
-      onSuccess(session);
-      onClose();
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Gagal mendaftarkan jam tangan baru.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const session = await loginAuth({ username, password });
-      onSuccess(session);
-      onClose();
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Username atau password salah.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const containerClass = isFullScreen
-    ? 'min-h-screen w-full flex flex-col items-center justify-center bg-[#F6F7F9] p-4 select-none'
-    : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none animate-fadeIn';
+    ? 'min-h-screen w-full flex flex-col items-center justify-center bg-[#F6F7F9] p-4 select-none font-sans'
+    : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none font-sans animate-fadeIn';
 
   return (
     <>
       <div className={containerClass}>
-        {isFullScreen && (
-          <div className="mb-6 flex flex-col items-center text-center">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-8 h-8 bg-[#111111] text-white flex items-center justify-center font-black text-sm">
-                H.
-              </span>
-              <span className="text-[11px] font-black tracking-widest text-[#111111] uppercase">
-                Huawei Health Ecosystem
-              </span>
-            </div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-[#111111] tracking-tight">
-              AI-Powered Elderly Care Ecosystem
-            </h1>
-            <p className="text-xs text-neutral-500 max-w-sm mt-1">
-              Platform Pemantauan Biometrik Real-time, Deteksi Darurat & Pendamping Lansia
-            </p>
+        {/* Brand Header — Konsisten dengan Header Utama */}
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-8 h-8 bg-[#111111] text-white flex items-center justify-center font-black text-sm rounded-none">
+              H.
+            </span>
+            <span className="text-[11px] font-black tracking-widest text-[#111111] uppercase">
+              Huawei Health Ecosystem
+            </span>
           </div>
-        )}
+          <h1 className="text-xl md:text-2xl font-extrabold text-[#111111] tracking-tight">
+            AI-Powered Elderly Care Ecosystem
+          </h1>
+          <p className="text-xs text-neutral-500 max-w-sm mt-1">
+            Platform Pemantauan Biometrik Real-time, Deteksi Darurat & Pendamping Lansia
+          </p>
+        </div>
 
-        <div className="bg-white border-2 border-neutral-900 w-full max-w-lg rounded-none shadow-2xl overflow-hidden">
-          {/* Header Modal - Flat Solid Monochrome */}
+        {/* Modal Card — Konsisten dengan Flat Solid Monochrome & border-2 border-neutral-900 */}
+        <div className="bg-white border-2 border-neutral-900 w-full max-w-md rounded-none shadow-2xl overflow-hidden">
+          {/* Header Card */}
           <div className="bg-neutral-900 text-white p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-white text-neutral-900 flex items-center justify-center font-black text-sm">
@@ -151,10 +106,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold tracking-tight">
-                  Pairing Perangkat & Akses Ekosistem
+                  Pairing Perangkat Smartwatch
                 </h2>
                 <p className="text-[11px] text-neutral-400">
-                  Sistem Autentikasi & Pemantauan Multi-Device
+                  Pindai QR Code atau masukkan Token ID perangkat
                 </p>
               </div>
             </div>
@@ -170,56 +125,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             )}
           </div>
 
-          {/* Tab Selector - Flat Tabs */}
-          <div className="grid grid-cols-3 border-b-2 border-neutral-900 bg-neutral-100 text-xs font-bold">
-            <button
-              onClick={() => {
-                setTab('PAIR');
-                setErrorMsg(null);
-              }}
-              className={`py-3 px-2 flex items-center justify-center gap-2 border-r border-neutral-300 transition-colors cursor-pointer ${
-                tab === 'PAIR'
-                  ? 'bg-white text-neutral-900 border-b-2 border-b-white -mb-[2px]'
-                  : 'text-neutral-600 hover:bg-neutral-200/70'
-              }`}
-            >
-              <Watch className="w-3.5 h-3.5" />
-              <span>Pair ID Jam</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setTab('REGISTER');
-                setErrorMsg(null);
-              }}
-              className={`py-3 px-2 flex items-center justify-center gap-2 border-r border-neutral-300 transition-colors cursor-pointer ${
-                tab === 'REGISTER'
-                  ? 'bg-white text-neutral-900 border-b-2 border-b-white -mb-[2px]'
-                  : 'text-neutral-600 hover:bg-neutral-200/70'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Daftar Baru</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setTab('LOGIN');
-                setErrorMsg(null);
-              }}
-              className={`py-3 px-2 flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-                tab === 'LOGIN'
-                  ? 'bg-white text-neutral-900 border-b-2 border-b-white -mb-[2px]'
-                  : 'text-neutral-600 hover:bg-neutral-200/70'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Login Keluarga</span>
-            </button>
-          </div>
-
-          {/* Modal Body */}
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-5">
             {errorMsg && (
               <div className="p-3 bg-red-50 border border-red-500 text-red-700 text-xs flex items-center gap-2 font-medium">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
@@ -227,184 +133,105 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             )}
 
-            {/* TAB 1: PAIR TOKEN JAM TANGAN */}
-            {tab === 'PAIR' && (
-              <form onSubmit={handlePairSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                      Token ID Smartwatch
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsScannerOpen(true)}
-                      className="text-xs font-bold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 border border-neutral-400 px-2 py-1 flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-neutral-700" />
-                      <span>Scan QR Kamera</span>
-                    </button>
-                  </div>
+            {/* Tombol Utama: Scan QR Code Kamera (Depan & Belakang) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="w-full py-3.5 px-4 bg-[#111111] hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 cursor-pointer transition-all border-2 border-neutral-900 shadow-sm"
+              >
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Pindai QR Code via Kamera</span>
+                <QrCode className="w-4 h-4 text-neutral-300 ml-1" />
+              </button>
+              <p className="text-[11px] text-neutral-500 text-center mt-1.5">
+                Bisa pakai kamera belakang atau kamera depan (laptop / HP)
+              </p>
+            </div>
 
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={tokenInput}
-                      onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                      placeholder="Contoh: HUAWEI-ECA-8821"
-                      className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsScannerOpen(true)}
-                      className="px-3.5 bg-neutral-900 text-white hover:bg-neutral-800 flex items-center justify-center cursor-pointer border-2 border-neutral-900"
-                      title="Buka Kamera Scanner QR"
-                    >
-                      <QrCode className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-neutral-500">
-                    Arahkan kamera ke layar Wokwi atau ketik kode token secara manual.
-                  </p>
-                </div>
+            {/* Divider "ATAU MASUKKAN MANUAL" */}
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-neutral-300 w-full" />
+              <span className="bg-white px-3 text-[10px] font-bold text-neutral-400 uppercase tracking-widest shrink-0">
+                Atau Masukkan Manual
+              </span>
+              <div className="border-t border-neutral-300 w-full" />
+            </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                    Nama Lansia / Pasien (Opsional)
-                  </label>
+            {/* Form Input Manual */}
+            <form onSubmit={handlePairSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                  Token ID Smartwatch
+                </label>
+                <div className="flex gap-2">
                   <input
                     type="text"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="Misal: Kakek Hendra / Oma Siti"
-                    className="w-full px-3.5 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                    placeholder="Contoh: HUAWEI-ECA-8821"
+                    className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
                   />
-                  <p className="text-[11px] text-neutral-500">
-                    Jika jam tangan ini baru, profil dengan nama ini akan otomatis dibuatkan dan diingat di Chrome.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {loading ? 'Menghubungkan Perangkat...' : 'Hubungkan & Mulai Pantau'}
-                </button>
-
-                {/* Quick Demo Section */}
-                <div className="pt-3 border-t border-neutral-200">
-                  <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
-                    Akses Cepat Pengujian:
-                  </span>
                   <button
                     type="button"
-                    onClick={handleQuickDemo}
-                    disabled={loading}
-                    className="w-full py-2.5 px-4 bg-neutral-100 border-2 border-neutral-400 hover:border-neutral-900 text-neutral-900 text-xs font-bold flex items-center justify-between transition-all cursor-pointer"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-2 border-neutral-400 flex items-center justify-center cursor-pointer transition-colors"
+                    title="Buka Kamera Scanner"
                   >
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Gunakan Token Demo: <strong>HUAWEI-ECA-8821</strong> (Opa Budi Santoso)</span>
-                    </div>
-                    <span className="text-[10px] bg-neutral-900 text-white px-2 py-0.5 uppercase">1-Klik</span>
+                    <QrCode className="w-4 h-4" />
                   </button>
                 </div>
-              </form>
-            )}
+                <p className="text-[11px] text-neutral-500">
+                  Lihat Token ID di layar jam tangan OLED Wokwi atau Serial Monitor.
+                </p>
+              </div>
 
-            {/* TAB 2: DAFTAR JAM TANGAN / PASIEN BARU */}
-            {tab === 'REGISTER' && (
-              <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                <div className="p-3 bg-neutral-50 border border-neutral-200 text-[11px] text-neutral-600">
-                  <span className="font-bold text-neutral-900 block mb-1">Mencegah Tabrakan Data Saat Hosting:</span>
-                  Daftarkan Token ID baru untuk Wokwi Anda. Dashboard akan mengunci data hanya untuk ID ini, sehingga sesi pengujian lain tidak akan mencampuri telemetri Anda.
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                  Nama Lansia / Pasien (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  placeholder="Misal: Opa Budi Santoso / Oma Siti"
+                  className="w-full px-3.5 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                />
+                <p className="text-[11px] text-neutral-500">
+                  Jika jam tangan ini baru, profil otomatis dibuatkan sesuai nama ini.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>{loading ? 'Menghubungkan Perangkat...' : 'Hubungkan & Mulai Pantau'}</span>
+                {!loading && <ArrowRight className="w-3.5 h-3.5" />}
+              </button>
+            </form>
+
+            {/* Quick Demo Section (1-Klik) */}
+            <div className="pt-3 border-t border-neutral-200">
+              <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+                Akses Cepat Pengujian Demo:
+              </span>
+              <button
+                type="button"
+                onClick={handleQuickDemo}
+                disabled={loading}
+                className="w-full py-2.5 px-4 bg-neutral-50 border-2 border-neutral-300 hover:border-neutral-900 text-neutral-900 text-xs font-bold flex items-center justify-between transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Token Bawaan: <strong>HUAWEI-ECA-8821</strong> (Opa Budi)</span>
                 </div>
+                <span className="text-[10px] bg-neutral-900 text-white px-2 py-0.5 uppercase">1-Klik</span>
+              </button>
+            </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-800 uppercase">
-                    Token ID Jam Baru (Bebas / Auto)
-                  </label>
-                  <input
-                    type="text"
-                    value={regToken}
-                    onChange={(e) => setRegToken(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 text-xs font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-800 uppercase">
-                    Nama Lansia / Pasien
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Misal: Oma Siti Rahma"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer mt-2"
-                >
-                  {loading ? 'Mendaftarkan Perangkat...' : 'Daftarkan & Langsung Hubungkan'}
-                </button>
-              </form>
-            )}
-
-            {/* TAB 3: LOGIN KELUARGA (KREDENSIAL) */}
-            {tab === 'LOGIN' && (
-              <form onSubmit={handleLoginSubmit} className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-800 uppercase">
-                    Username Akun Keluarga
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-neutral-800 uppercase">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="p-2.5 bg-neutral-100 text-[11px] text-neutral-600">
-                  Akun demo default: <code className="font-bold text-neutral-900">rully</code> / <code className="font-bold text-neutral-900">demo123</code>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <LogIn className="w-3.5 h-3.5" />
-                    {loading ? 'Memverifikasi...' : 'Masuk Dashboard'}
-                  </span>
-                </button>
-              </form>
-            )}
-
-            {/* Footer Info */}
+            {/* Footer Kepatuhan & Status Sesi */}
             <div className="pt-3 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500">
               <span className="flex items-center gap-1.5 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-neutral-700" />
@@ -420,7 +247,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
       </div>
 
-      {/* Modal Scanner Kamera */}
+      {/* Modal Pemindai Kamera (Depan & Belakang) */}
       <QrCameraScanner
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
