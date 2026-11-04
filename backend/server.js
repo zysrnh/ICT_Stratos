@@ -270,6 +270,18 @@ app.get('/api/system/migrate', async (req, res) => {
   res.json(result);
 });
 
+// Endpoint Reset Telemetri Fresh (Mulai dari Nol)
+app.get('/api/system/reset-telemetry', async (req, res) => {
+  try {
+    await pool.query('TRUNCATE TABLE health_metrics');
+    await pool.query('TRUNCATE TABLE emergency_events');
+    await pool.query('TRUNCATE TABLE health_alerts');
+    res.json({ success: true, message: 'Data telemetri & kejadian darurat berhasil direset ke nol.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal reset data telemetri', details: err.message });
+  }
+});
+
 // Middleware Autentikasi Token (Juknis 8.1 & Anti-Collision)
 const verifyDeviceOrAuth = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -381,30 +393,102 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Endpoint Verifikasi / Pairing Token
+// Endpoint Verifikasi / Pairing Token (Bisa Sambung Eksisting atau Bikin Profil Baru Otomatis)
 app.post('/api/auth/pair', async (req, res) => {
   try {
-    const { token } = req.body;
+    const { token, patient_name, room_number } = req.body;
     if (!token) return res.status(400).json({ error: 'Token wajib disertakan.' });
 
+    const cleanToken = token.trim().toUpperCase();
+
+    // 1. Cek apakah token sudah ada di database
     const [devices] = await pool.execute(
       `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.room_number, p.age
        FROM devices d
        JOIN patients p ON d.patient_id = p.id
        WHERE d.device_token = ? OR (? IN ('HUAWEI-ECA-8821', 'HUAWEI_ECA_TOKEN_2026') AND d.patient_id = 1)`,
-      [token.trim(), token.trim()]
+      [cleanToken, cleanToken]
     );
 
-    if (devices.length === 0) {
-      return res.status(404).json({ error: 'Perangkat dengan token tersebut tidak ditemukan.' });
+    if (devices.length > 0) {
+      // Jika user memberikan nama baru dan bukan demo default, perbarui nama
+      if (patient_name && patient_name.trim() && devices[0].patient_id !== 1) {
+        await pool.execute('UPDATE patients SET full_name = ? WHERE id = ?', [patient_name.trim(), devices[0].patient_id]);
+        devices[0].patient_name = patient_name.trim();
+      }
+
+      return res.json({
+        success: true,
+        message: 'Perangkat berhasil dipasangkan (Paired)',
+        device: devices[0],
+        patient_id: devices[0].patient_id,
+        patient_name: devices[0].patient_name,
+        token: cleanToken,
+      });
     }
+
+    // 2. Jika token baru, langsung daftarkan profil pasien baru secara mandiri!
+    const targetName = (patient_name && patient_name.trim()) || `Lansia (${cleanToken.slice(-4)})`;
+    const patientCode = 'ELD-' + Date.now().toString().slice(-4);
+
+    const [patientResult] = await pool.execute(
+      `INSERT INTO patients (patient_code, full_name, age, gender, room_number, condition_summary)
+       VALUES (?, ?, 70, 'MALE', ?, 'Profil mandiri terdaftar otomatis via Smartwatch Pairing.')`,
+      [patientCode, targetName, room_number || 'Kamar Lansia']
+    );
+
+    const newPatientId = patientResult.insertId;
+    const watchId = `WATCH-${cleanToken.slice(0, 8)}`;
+    const homeId = `HOME-${cleanToken.slice(0, 8)}`;
+
+    await pool.execute(
+      `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+       VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+      [watchId, newPatientId, cleanToken]
+    );
+
+    await pool.execute(
+      `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+       VALUES (?, ?, ?, 'home', 'Huawei Smart Home Safety Node', 'ONLINE')`,
+      [homeId, newPatientId, cleanToken]
+    );
+
+    await pool.execute(
+      `INSERT INTO emergency_contacts (patient_id, name, relationship, phone_number, priority_order, is_primary)
+       VALUES (?, 'Keluarga Wali', 'Wali / Anak', '+62 812-3456-7890', 1, TRUE)`,
+      [newPatientId]
+    );
+
+    await pool.execute(
+      `INSERT INTO reminders (patient_id, reminder_type, title, time_scheduled, is_confirmed)
+       VALUES 
+       (?, 'MEDICINE', 'Minum Obat Rutin Pagi', '08:00', FALSE),
+       (?, 'ACTIVITY', 'Jalan Santai Pagi 15 Menit', '07:00', TRUE)`,
+      [newPatientId, newPatientId]
+    );
+
+    await pool.execute(
+      `INSERT INTO consents (patient_id, data_type, description, is_granted)
+       VALUES
+       (?, 'Biometrik Kesehatan', 'Pengumpulan detak jantung dan aktivitas langkah untuk deteksi anomali.', TRUE),
+       (?, 'Deteksi Jatuh & Darurat', 'Pemrosesan data IMU akselerometer untuk keselamatan darurat.', TRUE),
+       (?, 'AI Companion Chat', 'Penyimpanan riwayat percakapan pendampingan lansia.', TRUE)`,
+      [newPatientId, newPatientId, newPatientId]
+    );
 
     res.json({
       success: true,
-      message: 'Perangkat berhasil dipasangkan (Paired)',
-      device: devices[0],
-      patient_id: devices[0].patient_id,
-      patient_name: devices[0].patient_name,
+      message: 'Perangkat & Profil Baru berhasil dibuat dan dipasangkan!',
+      device: {
+        id: watchId,
+        patient_id: newPatientId,
+        device_token: cleanToken,
+        device_type: 'watch',
+        status: 'ONLINE',
+      },
+      patient_id: newPatientId,
+      patient_name: targetName,
+      token: cleanToken,
     });
   } catch (error) {
     res.status(500).json({ error: 'Gagal pairing perangkat', details: error.message });

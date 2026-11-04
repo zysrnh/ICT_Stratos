@@ -16,7 +16,7 @@ import {
   fetchEmergencyContacts,
   triggerSimulatedEvent,
   getSavedSession,
-  saveSession,
+  clearSession,
 } from './services/api';
 import type {
   HealthMetric,
@@ -33,41 +33,14 @@ export const App: React.FC = () => {
   const [alerts, setAlerts] = useState<HealthAlert[]>([]);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
 
-  // Sesi Autentikasi / Pairing Perangkat Anti-Collision
-  const [session, setSession] = useState<AuthSession | null>(() => {
-    const existing = getSavedSession();
-    if (existing) return existing;
-
-    // Sesi Default Pengujian Demo Juri (Opa Budi Santoso)
-    const defaultDemoSession: AuthSession = {
-      token: 'HUAWEI-ECA-8821',
-      auth_type: 'DEVICE_TOKEN',
-      user: {
-        id: 1,
-        full_name: 'Keluarga Opa Budi',
-        role: 'FAMILY_PRIMARY',
-      },
-      paired_device: {
-        id: 'HUAWEI-WATCH-001',
-        patient_id: 1,
-        device_token: 'HUAWEI-ECA-8821',
-        device_type: 'watch',
-        model_name: 'Huawei Smart Health Band Pro',
-        status: 'ONLINE',
-        patient_name: 'Opa Budi Santoso',
-      },
-      patient_id: 1,
-      patient_name: 'Opa Budi Santoso',
-    };
-    saveSession(defaultDemoSession);
-    return defaultDemoSession;
-  });
-
+  // Sesi Autentikasi / Pairing Perangkat (Tersimpan Permanen di Chrome LocalStorage)
+  const [session, setSession] = useState<AuthSession | null>(() => getSavedSession());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   const activePatientId = session?.patient_id ?? 1;
 
   const loadAllData = useCallback(async () => {
+    if (!session) return;
     try {
       const [latestMetrics, emergencyEvents, activeAlerts, emergencyContacts] =
         await Promise.all([
@@ -84,18 +57,30 @@ export const App: React.FC = () => {
     } catch (err) {
       console.error('[App Polling Error]:', err);
     }
-  }, [activePatientId]);
+  }, [session, activePatientId]);
 
   useEffect(() => {
+    if (!session) return;
     loadAllData();
     const timer = setInterval(loadAllData, 2500);
     return () => clearInterval(timer);
-  }, [loadAllData]);
+  }, [session, loadAllData]);
 
   const handleAuthSuccess = (newSession: AuthSession) => {
     setSession(newSession);
+    setIsAuthModalOpen(false);
     setMetrics([]);
     setEvents([]);
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setSession(null);
+    setMetrics([]);
+    setEvents([]);
+    setAlerts([]);
+    setContacts([]);
+    setIsAuthModalOpen(false);
   };
 
   const handleResolveEvent = async (eventId: string) => {
@@ -105,6 +90,20 @@ export const App: React.FC = () => {
       loadAllData();
     }
   };
+
+  // JIKA BELUM ADA PERANGKAT TERHUBUNG / BELUM LOGIN:
+  // Tampilkan Layar Penuh Gerbang Pairing Jam Tangan (Full Screen Gate)
+  if (!session) {
+    return (
+      <LoginModal
+        isOpen={true}
+        isFullScreen={true}
+        onClose={() => {}}
+        onSuccess={handleAuthSuccess}
+        currentSession={null}
+      />
+    );
+  }
 
   // Ekstraksi data metrik terbaru untuk Watch dan Home Node
   const latestWatchMetric =
@@ -129,11 +128,12 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         alertCount={activeAlertCount}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* 2. Main Dashboard Content */}
       <main className="flex-1 p-3.5 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-32 md:pb-8 overflow-y-auto">
-        {/* Banner Alert Kejadian Darurat Aktif (Juknis Bagian 6) */}
+        {/* Banner Alert Kejadian Darurat Aktif */}
         <EmergencyAlertBanner
           events={events}
           primaryContact={primaryContact}
@@ -145,9 +145,10 @@ export const App: React.FC = () => {
           alertCount={activeAlertCount}
           session={session}
           onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={handleLogout}
         />
 
-        {/* Tab 1: Health Monitoring (Pilar 1 - Default) */}
+        {/* Tab 1: Health Monitoring (Default) */}
         {activeTab === 'dashboard' && (
           <>
             {/* Top 4 Stat Metric Cards (Watch + Home Node Combined) */}
@@ -168,7 +169,7 @@ export const App: React.FC = () => {
           </>
         )}
 
-        {/* Tab 2: Home Safety & Environmental Node (Pilar 2) */}
+        {/* Tab 2: Home Safety & Environmental Node */}
         {activeTab === 'home' && (
           <HomeSafetyView
             events={events}
@@ -178,10 +179,10 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* Tab 3: AI Companionship & Reminders (Pilar 3) */}
+        {/* Tab 3: AI Companionship & Reminders */}
         {activeTab === 'companion' && <AiCompanionView />}
 
-        {/* Tab 4: Family Connection & UU PDP Consent (Pilar 4) */}
+        {/* Tab 4: Family Connection & UU PDP Consent */}
         {activeTab === 'family' && <FamilyPrivacyView />}
 
         {/* Tab 5: Settings & Arsitektur Sistem */}
@@ -189,7 +190,7 @@ export const App: React.FC = () => {
           <div className="bg-white rounded-none p-6 border-2 border-neutral-900 shadow-xs space-y-6">
             <div>
               <h3 className="text-lg font-bold text-[#111111]">
-                Informasi & Arsitektur Sistem (Juknis Bagian 4 & 8)
+                Informasi & Arsitektur Sistem
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
                 AI-Powered Elderly Care Ecosystem — Solusi Pemantauan dan Pendampingan Lansia Berbasis AI & IoT.
@@ -202,17 +203,25 @@ export const App: React.FC = () => {
                 <div>• Token ID Jam: <code className="bg-neutral-200 px-1.5 py-0.5 font-bold font-mono">{session?.token}</code></div>
                 <div>• Nama Lansia: <strong>{session?.patient_name}</strong> (ID: {session?.patient_id})</div>
                 <div>• Model Jam: <code className="bg-neutral-200 px-1.5 py-0.5">Huawei Smart Health Band Pro</code></div>
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="mt-3 px-3 py-1.5 bg-neutral-900 text-white font-bold text-xs uppercase cursor-pointer hover:bg-neutral-800"
-                >
-                  Ganti Perangkat / Token Lain
-                </button>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setIsAuthModalOpen(true)}
+                    className="px-3 py-1.5 bg-neutral-900 text-white font-bold text-xs uppercase cursor-pointer hover:bg-neutral-800"
+                  >
+                    Ganti Jam / Token
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 bg-red-600 text-white font-bold text-xs uppercase cursor-pointer hover:bg-red-700"
+                  >
+                    Putuskan Koneksi
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 bg-neutral-50 border border-neutral-300 space-y-2">
-                <span className="font-bold text-neutral-900 block">Infrastruktur Multi-Tenant / Anti-Collision:</span>
-                <div>• Database: Huawei Cloud RDS (MySQL 8.0) — Terhubung Normal</div>
+                <span className="font-bold text-neutral-900 block">Infrastruktur Multi-Tenant & Keamanan:</span>
+                <div>• Database: Huawei Cloud RDS / MySQL 8.0 — Terhubung Normal</div>
                 <div>• Isolasi Data: Data difilter ketat per <code>device_token</code> &amp; <code>patient_id</code></div>
                 <div>• Protokol: Enkripsi REST API over TLS / Bearer Token</div>
                 <div>• Kepatuhan: UU No. 27/2022 Pelindungan Data Pribadi</div>
@@ -230,12 +239,13 @@ export const App: React.FC = () => {
         onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
-      {/* 4. Modal Pairing & Login Anti-Collision */}
+      {/* 4. Modal Pairing & Ganti Token (Saat Berada di Dalam Dashboard) */}
       <LoginModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={handleAuthSuccess}
         currentSession={session}
+        isFullScreen={false}
       />
     </div>
   );

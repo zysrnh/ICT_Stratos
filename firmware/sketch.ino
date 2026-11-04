@@ -57,7 +57,7 @@ const char* WIFI_PASS = "";
 #endif
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
-const char* API_KEY       = "HUAWEI-ECA-8821";   // Token ID Perangkat (Anti-Collision: ganti sesuai token di web jika buat ID baru)
+char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Bisa dinamis / perintah 'token new')
 
 // ==========================================
 // Identitas
@@ -283,7 +283,8 @@ int postJson(const char* url, const char* body) {
   http.setConnectTimeout(3000);
   http.setTimeout(4000);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", String("Bearer ") + API_KEY);
+  http.addHeader("Authorization", String("Bearer ") + activeToken);
+  http.addHeader("x-device-token", activeToken);
   http.addHeader("X-Pinggy-No-Screen", "1");
   int code = http.POST(String(body));
   if (code > 0) Serial.printf("[Cloud] %s -> HTTP %d\n", url, code);
@@ -466,11 +467,18 @@ void runCmd(char* s) {
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
   else if (!strcmp(s, "smoke")) { simSmoke = true; }
   else if (!strcmp(s, "clear")) { simSmoke = false; }
+  else if (!strcmp(s, "token")) {
+    Serial.printf("\n[SMARTWATCH PAIRING INFO]\n  TOKEN AKTIF : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
+  }
+  else if (!strcmp(s, "token new")) {
+    snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
+    Serial.printf("\n[TOKEN BARU DIGENERATE]\n  TOKEN BARU  : %s\n  URL PAIRING : https://%s/?pair=%s\n\n", activeToken, API_HOST, activeToken);
+  }
   else if (!strncmp(s, "hr ", 3)) {
     if (!strcmp(s + 3, "auto")) hrOverride = -1;
     else hrOverride = atoi(s + 3);
   }
-  else Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto");
+  else Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto | token | token new");
   Serial.printf("[SIM] ok: %s\n", s);
 }
 
@@ -586,15 +594,52 @@ void setup() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("[Display] SSD1306 tidak terdeteksi!");
   } else {
+    // Layar Pairing Booting Smartwatch
     display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
+    display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
+    display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
     display.setTextSize(1);
-    display.setCursor(10, 24);
-    display.println("Elderly Care Band");
-    display.setCursor(24, 40);
-    display.println("Memulai...");
+    display.setCursor(6, 2);
+    display.print("HUAWEI BAND PAIRING");
+
+    display.setTextColor(SSD1306_WHITE);
+    // Gambar Mini QR Code Box (Simulated QR di kanan layar)
+    display.drawRect(88, 16, 36, 36, SSD1306_WHITE);
+    display.fillRect(92, 20, 8, 8, SSD1306_WHITE);
+    display.fillRect(112, 20, 8, 8, SSD1306_WHITE);
+    display.fillRect(92, 40, 8, 8, SSD1306_WHITE);
+    display.fillRect(104, 30, 4, 4, SSD1306_WHITE);
+    display.setCursor(88, 54);
+    display.setTextSize(1);
+    display.print("SCAN QR");
+
+    // Informasi Kode Pairing di Kiri Layar
+    display.setCursor(4, 16);
+    display.print("PAIR CODE:");
+    display.setTextSize(1);
+    display.setCursor(4, 28);
+    display.print(activeToken);
+
+    display.setCursor(4, 42);
+    display.print("Buka di Chrome:");
+    display.setCursor(4, 52);
+    display.print(API_HOST);
+
     display.display();
+    delay(2000); // Tampilkan layar pairing selama 2 detik saat boot
   }
+
+  // Cetak Banner Pairing Siap Pakai di Serial Monitor
+  Serial.println("\n=============================================================");
+  Serial.println("  HUAWEI SMART HEALTH BAND - SMARTWATCH PAIRING READY        ");
+  Serial.println("=============================================================");
+  Serial.printf ("  DEVICE ID   : %s\n", DEVICE_ID);
+  Serial.printf ("  TOKEN ID    : %s\n", activeToken);
+  Serial.printf ("  URL PAIRING : https://%s/?pair=%s\n", API_HOST, activeToken);
+  Serial.println("=============================================================");
+  Serial.println("👉 Klik link URL PAIRING di atas untuk langsung menghubungkan ke Chrome!\n");
+  Serial.println("[INFO] Ketik 'token new' di Serial Monitor jika ingin buat Token Baru.\n");
 
   mpuOk = initMpu();
   Serial.println(mpuOk ? "[MPU6050] OK" : "[MPU6050] TIDAK TERDETEKSI - deteksi jatuh nonaktif");

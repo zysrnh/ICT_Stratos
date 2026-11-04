@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Watch, KeyRound, UserPlus, LogIn, X, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { loginAuth, pairDevice, registerDevice } from '../services/api';
 import type { AuthSession } from '../types/telemetry';
@@ -8,6 +8,7 @@ interface LoginModalProps {
   onClose: () => void;
   onSuccess: (session: AuthSession) => void;
   currentSession: AuthSession | null;
+  isFullScreen?: boolean;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -15,19 +16,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   onSuccess,
   currentSession,
+  isFullScreen = false,
 }) => {
   const [tab, setTab] = useState<'PAIR' | 'REGISTER' | 'LOGIN'>('PAIR');
   const [tokenInput, setTokenInput] = useState('');
+  const [patientName, setPatientName] = useState('');
   const [username, setUsername] = useState('rully');
   const [password, setPassword] = useState('demo123');
 
-  // Form Register
+  // Form Register Mandiri
   const [regToken, setRegToken] = useState(`ECA-${Math.floor(1000 + Math.random() * 9000)}`);
   const [regName, setRegName] = useState('');
-  const [regRoom, setRegRoom] = useState('Kamar Lansia (Lantai 1)');
+  const [regRoom, setRegRoom] = useState('Kamar Lansia');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Auto-detect token dari URL parameter (?pair=... atau ?token=...)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('pair') || params.get('token');
+      if (urlToken) {
+        setTokenInput(urlToken.trim().toUpperCase());
+      }
+    }
+  }, []);
 
   if (!isOpen) return null;
 
@@ -40,7 +54,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const session = await pairDevice(tokenInput.trim());
+      const session = await pairDevice(tokenInput.trim(), patientName.trim() || undefined);
       onSuccess(session);
       onClose();
     } catch (err: unknown) {
@@ -54,7 +68,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
     try {
-      const session = await pairDevice('HUAWEI-ECA-8821');
+      const session = await pairDevice('HUAWEI-ECA-8821', 'Opa Budi Santoso');
       onSuccess(session);
       onClose();
     } catch (err: unknown) {
@@ -102,8 +116,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
+  const containerClass = isFullScreen
+    ? 'min-h-screen w-full flex flex-col items-center justify-center bg-[#F6F7F9] p-4 select-none'
+    : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none animate-fadeIn';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none animate-fadeIn">
+    <div className={containerClass}>
+      {isFullScreen && (
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-8 h-8 bg-[#111111] text-white flex items-center justify-center font-black text-sm">
+              H.
+            </span>
+            <span className="text-[11px] font-black tracking-widest text-[#111111] uppercase">
+              Huawei Health Ecosystem
+            </span>
+          </div>
+          <h1 className="text-xl md:text-2xl font-extrabold text-[#111111] tracking-tight">
+            AI-Powered Elderly Care Ecosystem
+          </h1>
+          <p className="text-xs text-neutral-500 max-w-sm mt-1">
+            Platform Pemantauan Biometrik Real-time, Deteksi Darurat & Pendamping Lansia
+          </p>
+        </div>
+      )}
+
       <div className="bg-white border-2 border-neutral-900 w-full max-w-lg rounded-none shadow-2xl overflow-hidden">
         {/* Header Modal - Flat Solid Monochrome */}
         <div className="bg-neutral-900 text-white p-5 flex items-center justify-between">
@@ -116,12 +153,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 Pairing Perangkat & Akses Ekosistem
               </h2>
               <p className="text-[11px] text-neutral-400">
-                Sistem Autentikasi Anti-Collision (Juknis Bagian 5 & 8)
+                Sistem Autentikasi & Pemantauan Multi-Device
               </p>
             </div>
           </div>
 
-          {currentSession && (
+          {!isFullScreen && currentSession && (
             <button
               onClick={onClose}
               className="text-neutral-400 hover:text-white transition-colors cursor-pointer p-1"
@@ -194,33 +231,49 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <form onSubmit={handlePairSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                  Token ID Smartwatch Lansia
+                  Token ID Smartwatch
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                    placeholder="Contoh: HUAWEI-ECA-8821"
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-5 py-2.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {loading ? 'Menghubungkan...' : 'Pasangkan'}
-                  </button>
-                </div>
-                <p className="text-[11px] text-neutral-500 mt-1">
-                  Masukkan token yang sama dengan konstanta <code className="bg-neutral-100 px-1 py-0.5 border border-neutral-200">API_KEY</code> di firmware Wokwi.
+                <input
+                  type="text"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                  placeholder="Contoh: HUAWEI-ECA-8821 atau kode dari Wokwi"
+                  className="w-full px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                  required
+                />
+                <p className="text-[11px] text-neutral-500">
+                  Lihat Token ID di layar jam tangan OLED Wokwi atau Serial Monitor.
                 </p>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                  Nama Lansia / Pasien (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  placeholder="Misal: Kakek Hendra / Oma Siti"
+                  className="w-full px-3.5 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                />
+                <p className="text-[11px] text-neutral-500">
+                  Jika jam tangan ini baru, profil dengan nama ini akan otomatis dibuatkan dan diingat di Chrome.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 bg-neutral-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? 'Menghubungkan Perangkat...' : 'Hubungkan & Mulai Pantau'}
+              </button>
 
               {/* Quick Demo Section */}
               <div className="pt-3 border-t border-neutral-200">
                 <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
-                  Akses Cepat Pengujian Juri:
+                  Akses Cepat Pengujian:
                 </span>
                 <button
                   type="button"
@@ -243,7 +296,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <form onSubmit={handleRegisterSubmit} className="space-y-3">
               <div className="p-3 bg-neutral-50 border border-neutral-200 text-[11px] text-neutral-600">
                 <span className="font-bold text-neutral-900 block mb-1">Mencegah Tabrakan Data Saat Hosting:</span>
-                Daftarkan Token ID baru untuk Wokwi Anda. Dashboard akan mengunci data hanya untuk ID ini, sehingga juri lain tidak akan mencampuri telemetri Anda.
+                Daftarkan Token ID baru untuk Wokwi Anda. Dashboard akan mengunci data hanya untuk ID ini, sehingga sesi pengujian lain tidak akan mencampuri telemetri Anda.
               </div>
 
               <div className="space-y-1">
@@ -341,7 +394,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </form>
           )}
 
-          {/* Footer Info Anti-Collision */}
+          {/* Footer Info */}
           <div className="pt-3 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500">
             <span className="flex items-center gap-1.5 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-neutral-700" />
@@ -358,4 +411,3 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     </div>
   );
 };
-

@@ -131,11 +131,11 @@ export const AiCompanionView: React.FC = () => {
           </div>
         </div>
 
-        {/* Batasan Etis AI (Juknis 5.4 Wajib Ada) */}
-        <div className="bg-neutral-900 text-white rounded-3xl p-5 border border-neutral-800 shadow-sm">
+        {/* Batasan Etis AI */}
+        <div className="bg-neutral-900 text-white rounded-none p-5 border border-neutral-800 shadow-sm">
           <div className="flex items-center gap-2 mb-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
             <ShieldAlert className="w-4 h-4" />
-            <span>Batasan Perilaku AI (Juknis 5.4)</span>
+            <span>Panduan Etika & Batasan Medis AI</span>
           </div>
           <p className="text-xs text-neutral-400 leading-relaxed">
             Asisten AI tidak memberikan diagnosis medis langsung. Respon difokuskan pada sapaan ramah,

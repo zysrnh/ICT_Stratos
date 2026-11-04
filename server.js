@@ -3,3 +3,4 @@
 // AI-Powered Elderly Care Ecosystem (ECA)
 // =============================================================
 require('./backend/server.js');
+

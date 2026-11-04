@@ -114,22 +114,22 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
         </div>
       </div>
 
-      {/* 2. Interactive Demonstration Panel untuk Juri (Juknis 10: Skenario Demo) */}
-      <div className="bg-[#111111] text-white rounded-3xl p-6 shadow-xl">
+      {/* 2. Interactive Demonstration Panel */}
+      <div className="bg-[#111111] text-white rounded-none p-6 shadow-xl border-2 border-neutral-900">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
               Live Evaluation Tool
             </span>
-            <h3 className="text-lg font-bold">Simulator Skenario Darurat untuk Juri</h3>
+            <h3 className="text-lg font-bold">Simulator & Uji Respons Darurat</h3>
           </div>
-          <span className="text-xs bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full border border-neutral-700">
-            Juknis 5.5: Simulator Wajib Ada
+          <span className="text-xs bg-neutral-800 text-neutral-300 px-3 py-1 rounded-none border border-neutral-700">
+            Emergency Simulator Tool
           </span>
         </div>
         <p className="text-xs text-neutral-400 mb-5 max-w-xl">
-          Gunakan tombol di bawah ini untuk mensimulasikan kejadian darurat secara terkontrol saat presentasi juri.
-          Sistem akan mendemonstrasikan alur verifikasi jam tangan hingga eskalasi keluarga.
+          Gunakan tombol di bawah ini untuk mensimulasikan kejadian darurat secara terkontrol.
+          Sistem akan mendemonstrasikan alur verifikasi jam tangan hingga eskalasi ke kontak keluarga.
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

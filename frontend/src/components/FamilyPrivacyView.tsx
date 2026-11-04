@@ -78,8 +78,8 @@ export const FamilyPrivacyView: React.FC = () => {
               </div>
               <h3 className="text-base font-bold text-[#111111]">Eskalasi Kontak Darurat</h3>
             </div>
-            <span className="text-xs bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
-              Juknis 6.1
+            <span className="text-xs bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-none">
+              Hierarki Prioritas
             </span>
           </div>
 
@@ -177,10 +177,10 @@ export const FamilyPrivacyView: React.FC = () => {
             ))}
           </div>
 
-          <div className="mt-5 p-3.5 rounded-2xl bg-neutral-900 text-white text-[11px] space-y-1">
+          <div className="mt-5 p-3.5 rounded-none bg-neutral-900 text-white text-[11px] space-y-1">
             <div className="flex items-center gap-2 text-emerald-400 font-bold">
               <Lock className="w-3.5 h-3.5" />
-              <span>Standar Pengamanan Data Juknis 8.1</span>
+              <span>Standar Pengamanan Data Transit & At-Rest</span>
             </div>
             <p className="text-neutral-400">
               Enkripsi data transit (TLS/HTTPS), enkripsi database RDS Huawei Cloud, pembatasan akses berbasis peran (RBAC),

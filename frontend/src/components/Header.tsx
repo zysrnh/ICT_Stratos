@@ -1,14 +1,20 @@
 import React from 'react';
-import { Bell, Search, Watch, RefreshCw } from 'lucide-react';
+import { Bell, Search, Watch, RefreshCw, LogOut } from 'lucide-react';
 import type { AuthSession } from '../types/telemetry';
 
 interface HeaderProps {
   alertCount: number;
   session: AuthSession | null;
   onOpenAuth: () => void;
+  onLogout?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ alertCount, session, onOpenAuth }) => {
+export const Header: React.FC<HeaderProps> = ({
+  alertCount,
+  session,
+  onOpenAuth,
+  onLogout,
+}) => {
   return (
     <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pt-1 select-none">
       {/* Title & Patient Information */}
@@ -73,6 +79,17 @@ export const Header: React.FC<HeaderProps> = ({ alertCount, session, onOpenAuth 
         >
           {session?.user?.role === 'FAMILY_PRIMARY' ? 'FAM' : 'ECA'}
         </button>
+
+        {/* Disconnect Button in Header */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Putuskan Koneksi / Logout"
+            className="w-10 h-10 bg-white border border-neutral-300 text-neutral-600 hover:text-red-600 hover:border-red-500 transition-colors flex items-center justify-center shadow-xs cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </header>
   );
