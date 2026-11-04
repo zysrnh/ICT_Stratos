@@ -28,7 +28,7 @@
 #include <ArduinoJson.h>
 #include <time.h>
 #include <math.h>
-#include <qrcode.h>
+#include <esp_qrcode.h>
 
 // ==========================================
 // OLED SSD1306 (I2C)
@@ -193,31 +193,18 @@ bool btnEdge(Btn &b) {
 }
 
 // ==========================================
-// Tampilan QR Code Layar Penuh SSD1306 (Dinamis Real-Time)
+// Tampilan QR Code Layar Penuh SSD1306 (ESP32 Built-in esp_qrcode)
 // ==========================================
-void drawQrCodeScreen() {
-  display.clearDisplay();
-  
-  // Header bar solid
-  display.fillRect(0, 0, 128, 10, SSD1306_WHITE);
-  display.setTextColor(SSD1306_BLACK);
-  display.setTextSize(1);
-  display.setCursor(4, 1);
-  display.print("HUAWEI BAND PAIRING");
-
-  // Inisialisasi QR Code Dinamis Version 2 (25x25 modul, muat token hingga 32 karakter)
-  QRCode qrcode;
-  uint8_t qrcodeData[qrcode_getBufferSize(2)];
-  qrcode_initText(&qrcode, qrcodeData, 2, ECC_LOW, activeToken);
-
+void disp_qrcode_callback(esp_qrcode_handle_t qrcode) {
+  int qr_size = esp_qrcode_get_size(qrcode);
   int scale = 2;
   int offsetX = 4;
   int offsetY = 12;
 
-  // Gambar modul QR Code di sisi kiri OLED (50x50 px)
-  for (uint8_t y = 0; y < qrcode.size; y++) {
-    for (uint8_t x = 0; x < qrcode.size; x++) {
-      if (qrcode_getModule(&qrcode, x, y)) {
+  // Gambar modul QR Code di sisi kiri OLED
+  for (int y = 0; y < qr_size; y++) {
+    for (int x = 0; x < qr_size; x++) {
+      if (esp_qrcode_get_module(qrcode, x, y)) {
         display.fillRect(offsetX + (x * scale), offsetY + (y * scale), scale, scale, SSD1306_WHITE);
       }
     }
@@ -245,6 +232,25 @@ void drawQrCodeScreen() {
   display.print("TEKAN OK = OK");
 
   display.display();
+}
+
+void drawQrCodeScreen() {
+  display.clearDisplay();
+  
+  // Header bar solid
+  display.fillRect(0, 0, 128, 10, SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK);
+  display.setTextSize(1);
+  display.setCursor(4, 1);
+  display.print("HUAWEI BAND PAIRING");
+
+  // Inisialisasi QR Code Dinamis menggunakan komponen bawaan ESP-IDF (esp_qrcode)
+  esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
+  cfg.display_func = disp_qrcode_callback;
+  cfg.max_qrcode_version = 3;
+  cfg.qrcode_ecc_level = ESP_QRCODE_ECC_LOW;
+
+  esp_qrcode_generate(&cfg, activeToken);
 }
 
 // ==========================================
