@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle2, ShieldCheck, AlertCircle, Camera, QrCode, ArrowRight } from 'lucide-react';
+import {
+  X,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle,
+  Camera,
+  QrCode,
+  ArrowRight,
+  User,
+  HeartPulse,
+  ArrowLeft,
+  Watch,
+} from 'lucide-react';
 import { pairDevice } from '../services/api';
 import type { AuthSession } from '../types/telemetry';
 import { QrCameraScanner } from './QrCameraScanner';
@@ -19,8 +31,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   currentSession,
   isFullScreen = false,
 }) => {
+  const [step, setStep] = useState<'scan' | 'configure'>('scan');
   const [tokenInput, setTokenInput] = useState('');
   const [patientName, setPatientName] = useState('');
+  const [age, setAge] = useState<number>(70);
+  const [gender, setGender] = useState<'MALE' | 'FEMALE'>('MALE');
+  const [conditionSummary, setConditionSummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -32,17 +48,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const urlToken = params.get('pair') || params.get('token');
       if (urlToken) {
         setTokenInput(urlToken.trim().toUpperCase());
+        setStep('configure');
       }
     }
   }, []);
 
   if (!isOpen) return null;
 
-  const triggerPair = async (tokenToUse: string, patientNameToUse?: string) => {
+  const handleScanSuccess = (scannedToken: string) => {
+    setIsScannerOpen(false);
+    const cleaned = scannedToken.trim().toUpperCase();
+    setTokenInput(cleaned);
+    setErrorMsg(null);
+    setStep('configure');
+  };
+
+  const handleNextToConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenInput.trim()) {
+      setErrorMsg('Masukkan Token ID Smartwatch atau scan QR Code.');
+      return;
+    }
+    setErrorMsg(null);
+    setStep('configure');
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patientName.trim()) {
+      setErrorMsg('Nama lengkap lansia wajib diisi.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
-      const session = await pairDevice(tokenToUse.trim(), patientNameToUse?.trim() || undefined);
+      const session = await pairDevice({
+        token: tokenInput.trim().toUpperCase(),
+        patientName: patientName.trim(),
+        age: Number(age) || 70,
+        gender: gender,
+        conditionSummary: conditionSummary.trim() || 'Kondisi kesehatan stabil dalam pemantauan rutin.',
+      });
       onSuccess(session);
       onClose();
     } catch (err: unknown) {
@@ -52,23 +99,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handlePairSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tokenInput.trim()) {
-      setErrorMsg('Masukkan Token ID Jam Tangan atau pindai QR Code.');
-      return;
-    }
-    await triggerPair(tokenInput, patientName);
-  };
-
-  const handleScanSuccess = async (scannedToken: string) => {
-    setIsScannerOpen(false);
-    setTokenInput(scannedToken);
-    await triggerPair(scannedToken, patientName);
-  };
-
   const handleQuickDemo = async () => {
-    await triggerPair('HUAWEI-ECA-8821', 'Opa Budi Santoso');
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const session = await pairDevice({
+        token: 'HUAWEI-ECA-8821',
+        patientName: 'Opa Budi Santoso',
+        age: 71,
+        gender: 'MALE',
+        conditionSummary: 'Hipertensi terkontrol dengan Amlodipine 5mg. Riwayat pusing ringan saat posisi tidur ke berdiri.',
+        isDemo: true,
+      });
+      onSuccess(session);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal memuat akun demo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const containerClass = isFullScreen
@@ -78,7 +127,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   return (
     <>
       <div className={containerClass}>
-        {/* Brand Header — Konsisten dengan Header Utama */}
+        {/* Brand Header */}
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="flex items-center gap-2 mb-2">
             <span className="w-8 h-8 bg-[#111111] text-white flex items-center justify-center font-black text-sm rounded-none">
@@ -96,7 +145,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </p>
         </div>
 
-        {/* Modal Card — Konsisten dengan Flat Solid Monochrome & border-2 border-neutral-900 */}
+        {/* Modal Card */}
         <div className="bg-white border-2 border-neutral-900 w-full max-w-md rounded-none shadow-2xl overflow-hidden">
           {/* Header Card */}
           <div className="bg-neutral-900 text-white p-5 flex items-center justify-between">
@@ -106,10 +155,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold tracking-tight">
-                  Pairing Perangkat Smartwatch
+                  {step === 'scan' ? 'Pairing Smartwatch Lansia' : 'Konfigurasi Profil Lansia'}
                 </h2>
                 <p className="text-[11px] text-neutral-400">
-                  Pindai QR Code atau masukkan Token ID perangkat
+                  {step === 'scan'
+                    ? 'Pindai QR Code atau masukkan Token ID jam tangan'
+                    : 'Lengkapi profil lansia yang akan dipantau'}
                 </p>
               </div>
             </div>
@@ -133,105 +184,231 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             )}
 
-            {/* Tombol Utama: Scan QR Code Kamera (Depan & Belakang) */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setIsScannerOpen(true)}
-                className="w-full py-3.5 px-4 bg-[#111111] hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 cursor-pointer transition-all border-2 border-neutral-900 shadow-sm"
-              >
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Pindai QR Code via Kamera</span>
-                <QrCode className="w-4 h-4 text-neutral-300 ml-1" />
-              </button>
-              <p className="text-[11px] text-neutral-500 text-center mt-1.5">
-                Bisa pakai kamera belakang atau kamera depan (laptop / HP)
-              </p>
-            </div>
-
-            {/* Divider "ATAU MASUKKAN MANUAL" */}
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-neutral-300 w-full" />
-              <span className="bg-white px-3 text-[10px] font-bold text-neutral-400 uppercase tracking-widest shrink-0">
-                Atau Masukkan Manual
-              </span>
-              <div className="border-t border-neutral-300 w-full" />
-            </div>
-
-            {/* Form Input Manual */}
-            <form onSubmit={handlePairSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                  Token ID Smartwatch
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                    placeholder="Contoh: HUAWEI-ECA-8821"
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
-                  />
+            {/* ================= STEP 1: SCAN / INPUT TOKEN ================= */}
+            {step === 'scan' && (
+              <>
+                {/* Tombol Scan QR Camera */}
+                <div>
                   <button
                     type="button"
                     onClick={() => setIsScannerOpen(true)}
-                    className="px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-2 border-neutral-400 flex items-center justify-center cursor-pointer transition-colors"
-                    title="Buka Kamera Scanner"
+                    className="w-full py-3.5 px-4 bg-[#111111] hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 cursor-pointer transition-all border-2 border-neutral-900 shadow-sm"
                   >
-                    <QrCode className="w-4 h-4" />
+                    <Camera className="w-4 h-4 text-emerald-400" />
+                    <span>Pindai QR Code via Kamera</span>
+                    <QrCode className="w-4 h-4 text-neutral-300 ml-1" />
+                  </button>
+                  <p className="text-[11px] text-neutral-500 text-center mt-1.5">
+                    Arahkan kamera ke layar OLED jam tangan di Wokwi
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="relative flex items-center justify-center">
+                  <div className="border-t border-neutral-300 w-full" />
+                  <span className="bg-white px-3 text-[10px] font-bold text-neutral-400 uppercase tracking-widest shrink-0">
+                    Atau Masukkan Manual
+                  </span>
+                  <div className="border-t border-neutral-300 w-full" />
+                </div>
+
+                {/* Form Input Manual Token */}
+                <form onSubmit={handleNextToConfig} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                      Token ID Smartwatch
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={tokenInput}
+                        onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                        placeholder="Contoh: HUAWEI-ECA-XXXX"
+                        className="flex-1 px-3.5 py-2.5 text-sm font-mono border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsScannerOpen(true)}
+                        className="px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-2 border-neutral-400 flex items-center justify-center cursor-pointer transition-colors"
+                        title="Buka Kamera Scanner"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-neutral-500">
+                      Token tertera di layar OLED Wokwi atau Serial Monitor.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>Lanjut ke Atur Profil Lansia</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+
+                {/* Quick Demo Section (1-Klik) */}
+                <div className="pt-3 border-t border-neutral-200">
+                  <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+                    Akses Cepat Pengujian:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleQuickDemo}
+                    disabled={loading}
+                    className="w-full py-2.5 px-4 bg-neutral-50 border-2 border-neutral-300 hover:border-neutral-900 text-neutral-900 text-xs font-bold flex items-center justify-between transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Demo Bawaan: <strong>Opa Budi Santoso</strong></span>
+                    </div>
+                    <span className="text-[10px] bg-neutral-900 text-white px-2 py-0.5 uppercase">1-Klik</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-neutral-500">
-                  Lihat Token ID di layar jam tangan OLED Wokwi atau Serial Monitor.
-                </p>
-              </div>
+              </>
+            )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
-                  Nama Lansia / Pasien (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  placeholder="Misal: Opa Budi Santoso / Oma Siti"
-                  className="w-full px-3.5 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
-                />
-                <p className="text-[11px] text-neutral-500">
-                  Jika jam tangan ini baru, profil otomatis dibuatkan sesuai nama ini.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span>{loading ? 'Menghubungkan Perangkat...' : 'Hubungkan & Mulai Pantau'}</span>
-                {!loading && <ArrowRight className="w-3.5 h-3.5" />}
-              </button>
-            </form>
-
-            {/* Quick Demo Section (1-Klik) */}
-            <div className="pt-3 border-t border-neutral-200">
-              <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
-                Akses Cepat Pengujian Demo:
-              </span>
-              <button
-                type="button"
-                onClick={handleQuickDemo}
-                disabled={loading}
-                className="w-full py-2.5 px-4 bg-neutral-50 border-2 border-neutral-300 hover:border-neutral-900 text-neutral-900 text-xs font-bold flex items-center justify-between transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Token Bawaan: <strong>HUAWEI-ECA-8821</strong> (Opa Budi)</span>
+            {/* ================= STEP 2: KONFIGURASI PROFIL BARU ================= */}
+            {step === 'configure' && (
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                {/* Badge Token Terhubung */}
+                <div className="p-3 bg-neutral-100 border border-neutral-300 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Watch className="w-4 h-4 text-neutral-700" />
+                    <div>
+                      <span className="text-[10px] font-bold text-neutral-500 uppercase block">Smartwatch Terdeteksi</span>
+                      <span className="font-mono text-xs font-black text-neutral-900">{tokenInput}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep('scan')}
+                    className="text-[11px] font-bold text-neutral-600 hover:text-neutral-900 flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    <span>Ganti</span>
+                  </button>
                 </div>
-                <span className="text-[10px] bg-neutral-900 text-white px-2 py-0.5 uppercase">1-Klik</span>
-              </button>
-            </div>
 
-            {/* Footer Kepatuhan & Status Sesi */}
+                {/* Input Nama Lengkap Lansia */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-neutral-700" />
+                    <span>Nama Lengkap Lansia</span>
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
+                    placeholder="Contoh: Oma Ratna Sari / Kakek Subagio"
+                    className="w-full px-3.5 py-2.5 text-xs font-medium border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                  />
+                  <p className="text-[11px] text-neutral-500">
+                    Nama ini akan dipakai oleh AI Companion saat menyapa secara ramah.
+                  </p>
+                </div>
+
+                {/* Grid Usia & Jenis Kelamin */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                      Usia (Tahun)
+                    </label>
+                    <input
+                      type="number"
+                      min={40}
+                      max={120}
+                      value={age}
+                      onChange={(e) => setAge(Number(e.target.value))}
+                      className="w-full px-3.5 py-2 text-xs font-medium border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                      Jenis Kelamin
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGender('MALE')}
+                        className={`flex-1 py-2 text-xs font-bold border-2 cursor-pointer transition-colors ${
+                          gender === 'MALE'
+                            ? 'bg-neutral-900 text-white border-neutral-900'
+                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-500'
+                        }`}
+                      >
+                        Laki-laki
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGender('FEMALE')}
+                        className={`flex-1 py-2 text-xs font-bold border-2 cursor-pointer transition-colors ${
+                          gender === 'FEMALE'
+                            ? 'bg-neutral-900 text-white border-neutral-900'
+                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-500'
+                        }`}
+                      >
+                        Perempuan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Riwayat / Kondisi Medis */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <HeartPulse className="w-3.5 h-3.5 text-neutral-700" />
+                    <span>Kondisi / Riwayat Medis</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={conditionSummary}
+                    onChange={(e) => setConditionSummary(e.target.value)}
+                    placeholder="Contoh: Riwayat Hipertensi / Diabetes / Normal"
+                    className="w-full px-3.5 py-2 text-xs border-2 border-neutral-300 focus:border-neutral-900 focus:outline-none transition-colors"
+                  />
+                  {/* Quick Chips */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {['Hipertensi', 'Diabetes', 'Jantung', 'Normal / Sehat'].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setConditionSummary(chip)}
+                        className="text-[10px] font-bold px-2 py-0.5 border border-neutral-300 bg-neutral-50 hover:bg-neutral-200 text-neutral-700 cursor-pointer"
+                      >
+                        + {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tombol Simpan & Masuk */}
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep('scan')}
+                    className="py-2.5 px-3 border-2 border-neutral-300 hover:border-neutral-900 text-neutral-800 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>{loading ? 'Menyimpan Profil...' : 'Simpan & Masuk Dashboard'}</span>
+                    {!loading && <ArrowRight className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Footer Kepatuhan UU PDP */}
             <div className="pt-3 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500">
               <span className="flex items-center gap-1.5 font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-neutral-700" />

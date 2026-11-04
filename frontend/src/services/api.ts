@@ -72,14 +72,27 @@ export async function loginAuth(params: {
   return json as AuthSession;
 }
 
-export async function pairDevice(token: string, patientName?: string, roomNumber?: string): Promise<AuthSession> {
+export interface PairDeviceParams {
+  token: string;
+  patientName?: string;
+  age?: number;
+  gender?: 'MALE' | 'FEMALE';
+  conditionSummary?: string;
+  isDemo?: boolean;
+}
+
+export async function pairDevice(params: string | PairDeviceParams): Promise<AuthSession> {
+  const payload = typeof params === 'string' ? { token: params } : params;
   const res = await fetch(`${API_BASE}/auth/pair`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      token: token.trim().toUpperCase(),
-      patient_name: patientName?.trim(),
-      room_number: roomNumber?.trim(),
+      token: payload.token.trim().toUpperCase(),
+      patient_name: payload.patientName?.trim(),
+      age: payload.age,
+      gender: payload.gender,
+      condition_summary: payload.conditionSummary?.trim(),
+      is_demo: payload.isDemo,
     }),
   });
 
@@ -89,7 +102,7 @@ export async function pairDevice(token: string, patientName?: string, roomNumber
   }
 
   const session: AuthSession = {
-    token: token.trim().toUpperCase(),
+    token: payload.token.trim().toUpperCase(),
     auth_type: 'DEVICE_TOKEN',
     user: {
       id: 1,

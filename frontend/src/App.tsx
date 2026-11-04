@@ -183,7 +183,7 @@ export const App: React.FC = () => {
         {activeTab === 'companion' && <AiCompanionView session={session} />}
 
         {/* Tab 4: Family Connection & UU PDP Consent */}
-        {activeTab === 'family' && <FamilyPrivacyView />}
+        {activeTab === 'family' && <FamilyPrivacyView session={session} />}
 
         {/* Tab 5: Settings & Arsitektur Sistem */}
         {activeTab === 'settings' && (

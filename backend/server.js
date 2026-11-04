@@ -298,14 +298,41 @@ const verifyDeviceOrAuth = async (req, res, next) => {
       `SELECT d.*, p.id as patient_id, p.full_name as patient_name 
        FROM devices d
        JOIN patients p ON d.patient_id = p.id
-       WHERE d.device_token = ? OR d.device_token = 'HUAWEI-ECA-8821' OR d.device_token = 'HUAWEI_ECA_TOKEN_2026'`,
+       WHERE d.device_token = ?`,
       [headerToken]
     );
 
     if (rows.length > 0) {
-      // Cari yang match persis
-      const exact = rows.find(r => r.device_token === headerToken) || rows[0];
-      req.deviceInfo = exact;
+      req.deviceInfo = rows[0];
+      req.authenticatedToken = headerToken;
+    } else if (headerToken === 'HUAWEI-ECA-8821' || headerToken === 'HUAWEI_ECA_TOKEN_2026') {
+      const [demoRows] = await pool.execute(
+        `SELECT d.*, p.id as patient_id, p.full_name as patient_name 
+         FROM devices d 
+         JOIN patients p ON d.patient_id = p.id 
+         WHERE p.id = 1`
+      );
+      if (demoRows.length > 0) {
+        req.deviceInfo = demoRows[0];
+        req.authenticatedToken = headerToken;
+      }
+    } else {
+      // Auto-register device jika ESP32 langsung kirim data dengan token baru acak
+      const patientCode = 'ELD-' + Date.now().toString().slice(-4);
+      const targetName = `Lansia (${headerToken.slice(-4)})`;
+      const [ptRes] = await pool.execute(
+        `INSERT INTO patients (patient_code, full_name, age, gender, condition_summary)
+         VALUES (?, ?, 70, 'MALE', 'Profil mandiri terdaftar otomatis via Smartwatch.')`,
+        [patientCode, targetName]
+      );
+      const newPid = ptRes.insertId;
+      const watchId = `WATCH-${headerToken.slice(0, 8)}`;
+      await pool.execute(
+        `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status)
+         VALUES (?, ?, ?, 'watch', 'Huawei Smart Health Band Pro', 'ONLINE')`,
+        [watchId, newPid, headerToken]
+      );
+      req.deviceInfo = { id: watchId, patient_id: newPid, patient_name: targetName, device_token: headerToken };
       req.authenticatedToken = headerToken;
     }
     next();
@@ -396,25 +423,60 @@ app.post('/api/auth/login', async (req, res) => {
 // Endpoint Verifikasi / Pairing Token (Bisa Sambung Eksisting atau Bikin Profil Baru Otomatis)
 app.post('/api/auth/pair', async (req, res) => {
   try {
-    const { token, patient_name, room_number } = req.body;
+    const { token, patient_name, age, gender, condition_summary, is_demo } = req.body;
     if (!token) return res.status(400).json({ error: 'Token wajib disertakan.' });
 
     const cleanToken = token.trim().toUpperCase();
 
-    // 1. Cek apakah token sudah ada di database
+    // 1. Opsi Akses Cepat Demo (Opa Budi Santoso)
+    if (is_demo || (cleanToken === 'HUAWEI-ECA-8821' && (!patient_name || !patient_name.trim()))) {
+      const [demoDev] = await pool.execute(
+        `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.age, p.condition_summary
+         FROM devices d
+         JOIN patients p ON d.patient_id = p.id
+         WHERE p.id = 1 LIMIT 1`
+      );
+      if (demoDev.length > 0) {
+        return res.json({
+          success: true,
+          message: 'Terhubung ke Akun Demo Opa Budi Santoso',
+          device: demoDev[0],
+          patient_id: demoDev[0].patient_id,
+          patient_name: demoDev[0].patient_name,
+          age: demoDev[0].age,
+          condition_summary: demoDev[0].condition_summary,
+          token: cleanToken,
+        });
+      }
+    }
+
+    // 2. Cek apakah token sudah ada di database
     const [devices] = await pool.execute(
-      `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.room_number, p.age
+      `SELECT d.*, p.id as patient_id, p.full_name as patient_name, p.age, p.gender, p.condition_summary
        FROM devices d
        JOIN patients p ON d.patient_id = p.id
-       WHERE d.device_token = ? OR (? IN ('HUAWEI-ECA-8821', 'HUAWEI_ECA_TOKEN_2026') AND d.patient_id = 1)`,
-      [cleanToken, cleanToken]
+       WHERE d.device_token = ?`,
+      [cleanToken]
     );
 
     if (devices.length > 0) {
-      // Jika user memberikan nama baru dan bukan demo default, perbarui nama
-      if (patient_name && patient_name.trim() && devices[0].patient_id !== 1) {
-        await pool.execute('UPDATE patients SET full_name = ? WHERE id = ?', [patient_name.trim(), devices[0].patient_id]);
-        devices[0].patient_name = patient_name.trim();
+      const targetPid = devices[0].patient_id;
+      // Jika user mengisi nama atau konfigurasi profil baru
+      if (patient_name && patient_name.trim()) {
+        const newName = patient_name.trim();
+        const newAge = parseInt(age) || devices[0].age || 70;
+        const newGender = gender === 'FEMALE' ? 'FEMALE' : 'MALE';
+        const newCondition = condition_summary?.trim() || devices[0].condition_summary || 'Kondisi kesehatan stabil.';
+
+        await pool.execute(
+          'UPDATE patients SET full_name = ?, age = ?, gender = ?, condition_summary = ? WHERE id = ?',
+          [newName, newAge, newGender, newCondition, targetPid]
+        );
+
+        devices[0].patient_name = newName;
+        devices[0].age = newAge;
+        devices[0].gender = newGender;
+        devices[0].condition_summary = newCondition;
       }
 
       return res.json({
@@ -423,18 +485,24 @@ app.post('/api/auth/pair', async (req, res) => {
         device: devices[0],
         patient_id: devices[0].patient_id,
         patient_name: devices[0].patient_name,
+        age: devices[0].age,
+        gender: devices[0].gender,
+        condition_summary: devices[0].condition_summary,
         token: cleanToken,
       });
     }
 
-    // 2. Jika token baru, langsung daftarkan profil pasien baru secara mandiri!
+    // 3. Jika token baru belum terdaftar, buatkan profil pasien baru secara mandiri!
     const targetName = (patient_name && patient_name.trim()) || `Lansia (${cleanToken.slice(-4)})`;
     const patientCode = 'ELD-' + Date.now().toString().slice(-4);
+    const newAge = parseInt(age) || 70;
+    const newGender = gender === 'FEMALE' ? 'FEMALE' : 'MALE';
+    const newCondition = condition_summary?.trim() || 'Profil mandiri terdaftar otomatis via Smartwatch Pairing.';
 
     const [patientResult] = await pool.execute(
-      `INSERT INTO patients (patient_code, full_name, age, gender, room_number, condition_summary)
-       VALUES (?, ?, 70, 'MALE', ?, 'Profil mandiri terdaftar otomatis via Smartwatch Pairing.')`,
-      [patientCode, targetName, room_number || 'Kamar Lansia']
+      `INSERT INTO patients (patient_code, full_name, age, gender, condition_summary)
+       VALUES (?, ?, ?, ?, ?)`,
+      [patientCode, targetName, newAge, newGender, newCondition]
     );
 
     const newPatientId = patientResult.insertId;

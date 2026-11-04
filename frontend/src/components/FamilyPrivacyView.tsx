@@ -6,7 +6,7 @@ import {
   Lock,
   User,
 } from 'lucide-react';
-import type { EmergencyContact, ConsentItem, PatientInfo } from '../types/telemetry';
+import type { EmergencyContact, ConsentItem, PatientInfo, AuthSession } from '../types/telemetry';
 import {
   fetchEmergencyContacts,
   fetchConsents,
@@ -14,25 +14,34 @@ import {
   fetchPatients,
 } from '../services/api';
 
-export const FamilyPrivacyView: React.FC = () => {
+interface FamilyPrivacyViewProps {
+  session?: AuthSession | null;
+}
+
+export const FamilyPrivacyView: React.FC<FamilyPrivacyViewProps> = ({ session }) => {
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [consents, setConsents] = useState<ConsentItem[]>([]);
   const [patient, setPatient] = useState<PatientInfo | null>(null);
 
+  const activePatientId = session?.patient_id || 1;
+
   const loadData = async () => {
     const [c, cn, pts] = await Promise.all([
-      fetchEmergencyContacts(1),
-      fetchConsents(1),
+      fetchEmergencyContacts(activePatientId),
+      fetchConsents(activePatientId),
       fetchPatients(),
     ]);
     setContacts(c);
     setConsents(cn);
-    if (pts.length > 0) setPatient(pts[0]);
+    if (pts.length > 0) {
+      const current = pts.find((p) => p.id === activePatientId) || pts[0];
+      setPatient(current);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activePatientId]);
 
   const handleToggleConsent = async (id: number, current: boolean) => {
     await toggleConsent(id, !current);
@@ -54,10 +63,10 @@ export const FamilyPrivacyView: React.FC = () => {
                 {patient?.patient_code || 'ELD-001'} • Rekam Medis
               </span>
               <h3 className="text-lg font-extrabold text-[#111111]">
-                {patient?.full_name || 'Opa Budi Santoso'}
+                {patient?.full_name || session?.patient_name || 'Opa Budi Santoso'}
               </h3>
               <p className="text-xs text-neutral-500">
-                Usia {patient?.age || 71} Tahun • {patient?.room_number || 'Kamar Utama (Lantai 1)'}
+                Usia {patient?.age || 71} Tahun • {patient?.gender === 'FEMALE' ? 'Perempuan' : 'Laki-laki'}
               </p>
             </div>
           </div>

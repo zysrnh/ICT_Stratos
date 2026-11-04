@@ -28,6 +28,7 @@
 #include <ArduinoJson.h>
 #include <time.h>
 #include <math.h>
+#include <qrcode.h>
 
 // ==========================================
 // OLED SSD1306 (I2C)
@@ -57,34 +58,7 @@ const char* WIFI_PASS = "";
 #endif
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
-char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Bisa dinamis / perintah 'token new')
-
-// ==========================================
-// Matriks QR Code Asli 21x21 (HUAWEI-ECA-8821)
-// ==========================================
-static const uint8_t PROGMEM QR_HUAWEI_8821[21][3] = {
-  { 0xFE, 0x3B, 0xF8 }, // row 0
-  { 0x82, 0xEA, 0x08 }, // row 1
-  { 0xBA, 0x3A, 0xE8 }, // row 2
-  { 0xBA, 0xCA, 0xE8 }, // row 3
-  { 0xBA, 0x4A, 0xE8 }, // row 4
-  { 0x82, 0x92, 0x08 }, // row 5
-  { 0xFE, 0xAB, 0xF8 }, // row 6
-  { 0x00, 0x40, 0x00 }, // row 7
-  { 0xFB, 0x95, 0x50 }, // row 8
-  { 0xFD, 0x1D, 0xB8 }, // row 9
-  { 0x3F, 0x6E, 0xC8 }, // row 10
-  { 0x39, 0x5B, 0xD0 }, // row 11
-  { 0xB7, 0x0A, 0x20 }, // row 12
-  { 0x00, 0xAD, 0xF8 }, // row 13
-  { 0xFE, 0xB5, 0x28 }, // row 14
-  { 0x82, 0x43, 0x98 }, // row 15
-  { 0xBA, 0xB3, 0x90 }, // row 16
-  { 0xBA, 0xAA, 0x20 }, // row 17
-  { 0xBA, 0x89, 0x00 }, // row 18
-  { 0x82, 0x89, 0xA8 }, // row 19
-  { 0xFE, 0xCD, 0xC0 }  // row 20
-};
+char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Di-generate dinamis saat boot)
 
 // ==========================================
 // Identitas
@@ -219,7 +193,7 @@ bool btnEdge(Btn &b) {
 }
 
 // ==========================================
-// Tampilan QR Code Layar Penuh SSD1306
+// Tampilan QR Code Layar Penuh SSD1306 (Dinamis Real-Time)
 // ==========================================
 void drawQrCodeScreen() {
   display.clearDisplay();
@@ -231,31 +205,43 @@ void drawQrCodeScreen() {
   display.setCursor(4, 1);
   display.print("HUAWEI BAND PAIRING");
 
-  // Render QR Code 21x21 scaled 2x (42x42 px) di kiri layar (X: 4, Y: 14)
-  for (int r = 0; r < 21; r++) {
-    for (int c = 0; c < 21; c++) {
-      int byteIdx = c / 8;
-      int bitIdx = 7 - (c % 8);
-      bool isDark = (pgm_read_byte(&QR_HUAWEI_8821[r][byteIdx]) >> bitIdx) & 0x01;
-      if (isDark) {
-        display.fillRect(4 + c * 2, 14 + r * 2, 2, 2, SSD1306_WHITE);
+  // Inisialisasi QR Code Dinamis Version 2 (25x25 modul, muat token hingga 32 karakter)
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(2)];
+  qrcode_initText(&qrcode, qrcodeData, 2, ECC_LOW, activeToken);
+
+  int scale = 2;
+  int offsetX = 4;
+  int offsetY = 12;
+
+  // Gambar modul QR Code di sisi kiri OLED (50x50 px)
+  for (uint8_t y = 0; y < qrcode.size; y++) {
+    for (uint8_t x = 0; x < qrcode.size; x++) {
+      if (qrcode_getModule(&qrcode, x, y)) {
+        display.fillRect(offsetX + (x * scale), offsetY + (y * scale), scale, scale, SSD1306_WHITE);
       }
     }
   }
 
-  // Informasi teks di kanan layar (X: 50 s.d 127)
+  // Informasi teks token di sisi kanan OLED (X: 58 s.d 127)
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  display.setCursor(50, 14);
+  display.setCursor(58, 12);
   display.print("TOKEN ID:");
 
-  display.setCursor(50, 24);
-  display.print(activeToken);
+  display.setCursor(58, 22);
+  display.print("HUAWEI-ECA");
+  display.setCursor(58, 31);
+  if (strlen(activeToken) > 11) {
+    display.print(activeToken + 10); // misal: "-7F2A"
+  } else {
+    display.print(activeToken);
+  }
 
-  display.setCursor(50, 42);
+  display.setCursor(58, 43);
   display.print("SCAN KAMERA");
   
-  display.setCursor(50, 54);
+  display.setCursor(58, 54);
   display.print("TEKAN OK = OK");
 
   display.display();
@@ -658,6 +644,10 @@ void setup() {
   delay(300);
   Serial.println("\n=== AI-Powered Elderly Care - Device Layer ===");
   bootId = esp_random();
+
+  // Otomatis generate Token ID Unik Baru (acak) setiap kali ESP32 dinyalakan / di-reset!
+  snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
+
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_SYNC, OUTPUT);
   pinMode(POT_PIN, INPUT);
