@@ -362,46 +362,30 @@ void queueEvent(AlertKind k, const char* sev, const char* status, float val, boo
 }
 
 void sendTelemetry() {
-  char buf[400];
-
-  // --- Perangkat 1: Jam Pintar ---
-  {
-    StaticJsonDocument<512> d;
-    d["device_id"]      = DEVICE_ID;
-    d["patient_id"] = pairedPatientId;
-    d["device_type"]    = "watch";
-    d["heart_rate"]     = hrNow;
-    d["activity"]       = isActive ? "ACTIVE" : "REST";
-    d["steps"]          = steps;
-    d["accel_g"]        = lastG;
-    d["health_status"]  = healthStatus();
-    d["fall_cancelled"] = cancelledCount;
-    d["sensor_ok"]      = mpuOk;
-    d["sim"]            = (hrOverride > 0);
-    d["wifi_rssi"]      = WiFi.RSSI();
-    d["ts"]             = epochNow();
-    d["uptime_s"]       = millis() / 1000;
-    serializeJson(d, buf, sizeof(buf));
-    enqueueMsg(telQ, buf);
+  char buf[512];
+  StaticJsonDocument<512> d;
+  d["device_id"]      = DEVICE_ID;
+  d["patient_id"]     = pairedPatientId;
+  d["device_type"]    = "watch";
+  d["heart_rate"]     = hrNow;
+  d["activity"]       = isActive ? "ACTIVE" : "REST";
+  d["steps"]          = steps;
+  d["accel_g"]        = lastG;
+  d["health_status"]  = healthStatus();
+  d["fall_cancelled"] = cancelledCount;
+  d["sensor_ok"]      = mpuOk;
+  d["sim"]            = (hrOverride > 0 || simSmoke);
+  d["wifi_rssi"]      = WiFi.RSSI();
+  if (dhtOk) {
+    d["room_temp"]    = roomTemp;
+    d["humidity"]     = roomHum;
   }
-
-  // --- Perangkat 2: Node Rumah ---
-  {
-    StaticJsonDocument<512> d;
-    d["device_id"]    = HOME_DEVICE_ID;
-    d["patient_id"] = pairedPatientId;
-    d["device_type"]  = "home";
-    if (dhtOk) { d["room_temp"] = roomTemp; d["humidity"] = roomHum; }
-    else       { d["room_temp"] = nullptr;  d["humidity"] = nullptr; }
-    d["smoke_adc"]    = (int)smokeEma;
-    d["smoke_status"] = (curKind == K_SMOKE) ? "ALERT" : "NORMAL";
-    d["sensor_ok"]    = dhtOk;
-    d["sim"]          = simSmoke;
-    d["ts"]           = epochNow();
-    d["uptime_s"]     = millis() / 1000;
-    serializeJson(d, buf, sizeof(buf));
-    enqueueMsg(telQ, buf);
-  }
+  d["smoke_adc"]      = (int)smokeEma;
+  d["smoke_status"]   = (curKind == K_SMOKE) ? "ALERT" : "NORMAL";
+  d["ts"]             = epochNow();
+  d["uptime_s"]       = millis() / 1000;
+  serializeJson(d, buf, sizeof(buf));
+  enqueueMsg(telQ, buf);
 
   Serial.printf("[TEL] HR=%d %s steps=%lu g=%.2f | %s | rmh=%.1fC smoke=%d | queue evt=%u\n",
                 hrNow, isActive ? "ACTIVE" : "REST", (unsigned long)steps, lastG, healthStatus(),
@@ -417,6 +401,7 @@ int postJson(const char* url, const char* body) {
 #endif
   HTTPClient http;
   http.begin(client, url);
+  http.setReuse(false);
   http.setConnectTimeout(3000);
   http.setTimeout(4000);
   http.addHeader("Content-Type", "application/json");
@@ -467,7 +452,10 @@ void netTask(void*) {
       }
       continue;
     }
-    if (xQueueReceive(telQ, &m, pdMS_TO_TICKS(200)) == pdTRUE) postJson(URL_TELEMETRY, m.body);
+    if (xQueueReceive(telQ, &m, pdMS_TO_TICKS(200)) == pdTRUE) {
+      postJson(URL_TELEMETRY, m.body);
+      vTaskDelay(pdMS_TO_TICKS(500));
+    }
   }
 }
 

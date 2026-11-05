@@ -375,6 +375,47 @@ export async function triggerSimulatedEvent(
   }
 }
 
+// Injeksi data telemetri simulasi (Uji mandiri tanpa bergantung hardware / Wokwi)
+export async function sendSimulatedTelemetry(override?: Partial<{
+  heart_rate: number;
+  steps: number;
+  activity: string;
+  room_temp: number;
+  humidity: number;
+  smoke_adc: number;
+}>): Promise<boolean> {
+  try {
+    const session = getSavedSession();
+    const pid = session?.patient_id ?? 1;
+    const devId = session?.paired_device?.id || 'HUAWEI-WATCH-001';
+    const hr = override?.heart_rate ?? Math.floor(70 + Math.random() * 15);
+    const steps = override?.steps ?? Math.floor(120 + Math.random() * 50);
+    const res = await fetch(`${API_BASE}/telemetry`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        device_id: devId,
+        patient_id: pid,
+        device_type: 'watch',
+        heart_rate: hr,
+        activity: override?.activity ?? 'REST',
+        steps: steps,
+        accel_g: 1.0,
+        health_status: 'NORMAL',
+        room_temp: override?.room_temp ?? 27.2,
+        humidity: override?.humidity ?? 65.0,
+        smoke_adc: override?.smoke_adc ?? 350,
+        smoke_status: 'NORMAL',
+        sim: true,
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[Send Sim Telemetry Error]:', err);
+    return false;
+  }
+}
+
 export async function checkServerHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/health`);

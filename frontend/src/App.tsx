@@ -15,6 +15,7 @@ import {
   fetchActiveAlerts,
   fetchEmergencyContacts,
   triggerSimulatedEvent,
+  sendSimulatedTelemetry,
   getSavedSession,
   clearSession,
 } from './services/api';
@@ -25,6 +26,7 @@ import type {
   EmergencyContact,
   AuthSession,
 } from './types/telemetry';
+import { Zap } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -36,6 +38,10 @@ export const App: React.FC = () => {
   // Sesi Autentikasi / Pairing Perangkat (Tersimpan Permanen di Chrome LocalStorage)
   const [session, setSession] = useState<AuthSession | null>(() => getSavedSession());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  // State Simulasi Data Mandiri (Uji Coba Langsung di Web)
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simSteps, setSimSteps] = useState<number>(120);
 
   const activePatientId = session?.patient_id ?? 1;
 
@@ -59,12 +65,32 @@ export const App: React.FC = () => {
     }
   }, [session, activePatientId]);
 
+  // Polling data rutin setiap 2.5 detik
   useEffect(() => {
     if (!session) return;
     loadAllData();
     const timer = setInterval(loadAllData, 2500);
     return () => clearInterval(timer);
   }, [session, loadAllData]);
+
+  // Loop Injeksi Data Simulasi jika Mode Simulasi Web diaktifkan
+  useEffect(() => {
+    if (!isSimulating || !session) return;
+    const simTimer = setInterval(async () => {
+      const next = simSteps + Math.floor(1 + Math.random() * 3);
+      setSimSteps(next);
+      await sendSimulatedTelemetry({
+        heart_rate: Math.floor(72 + Math.random() * 15),
+        steps: next,
+        activity: next % 8 === 0 ? 'WALKING' : 'REST',
+        room_temp: +(26.8 + Math.random() * 0.8).toFixed(1),
+        humidity: +(63 + Math.random() * 3).toFixed(1),
+        smoke_adc: 310 + Math.floor(Math.random() * 35),
+      });
+      loadAllData();
+    }, 2500);
+    return () => clearInterval(simTimer);
+  }, [isSimulating, session, simSteps, loadAllData]);
 
   const handleAuthSuccess = (newSession: AuthSession) => {
     setSession(newSession);
@@ -81,6 +107,7 @@ export const App: React.FC = () => {
     setAlerts([]);
     setContacts([]);
     setIsAuthModalOpen(false);
+    setIsSimulating(false);
   };
 
   const handleResolveEvent = async (eventId: string) => {
@@ -89,6 +116,11 @@ export const App: React.FC = () => {
       await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
       loadAllData();
     }
+  };
+
+  const handleTriggerSim = async (type: 'FALL' | 'SOS' | 'SMOKE') => {
+    await triggerSimulatedEvent(type, 'ESCALATED', type === 'SMOKE' ? 2800 : 3.5);
+    loadAllData();
   };
 
   // JIKA BELUM ADA PERANGKAT TERHUBUNG / BELUM LOGIN:
@@ -148,6 +180,87 @@ export const App: React.FC = () => {
           onLogout={handleLogout}
         />
 
+        {/* Panel Pengujian & Simulator Real-time (Uji Mandiri Web) */}
+        <div className="mb-5 p-3.5 bg-white border-2 border-neutral-900 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`w-3 h-3 rounded-full flex items-center justify-center ${
+                isSimulating ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-300'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isSimulating ? 'bg-white' : 'bg-neutral-500'
+                }`}
+              />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                  {isSimulating ? 'Stream Simulasi IoT Aktif' : 'Simulator Pengujian Live (Mandiri Web)'}
+                </span>
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.5 uppercase ${
+                    isSimulating
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  {isSimulating ? 'Mengalir Real-time' : 'Siap Uji'}
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-500">
+                {isSimulating
+                  ? `Mengirim detak jantung, langkah & suhu ruangan real-time untuk ${session?.patient_name} (${session?.token}).`
+                  : 'Klik tombol di samping untuk uji coba langsung tanpa perlu menjalankan Wokwi.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={() => setIsSimulating(!isSimulating)}
+              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 border-2 ${
+                isSimulating
+                  ? 'bg-red-600 hover:bg-red-700 text-white border-red-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-900'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isSimulating ? 'Hentikan Stream' : 'Mulai Stream Data'}</span>
+            </button>
+
+            <div className="h-5 w-[1px] bg-neutral-300 mx-1 hidden sm:block" />
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase hidden lg:inline">
+                Uji Darurat:
+              </span>
+              <button
+                onClick={() => handleTriggerSim('FALL')}
+                className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-400 cursor-pointer transition-colors"
+                title="Memicu Simulasi Deteksi Jatuh"
+              >
+                🚨 Uji Jatuh
+              </button>
+              <button
+                onClick={() => handleTriggerSim('SOS')}
+                className="px-2.5 py-1 text-[11px] font-bold bg-red-50 hover:bg-red-100 text-red-900 border border-red-400 cursor-pointer transition-colors"
+                title="Memicu Tombol Darurat SOS"
+              >
+                🆘 Uji SOS
+              </button>
+              <button
+                onClick={() => handleTriggerSim('SMOKE')}
+                className="px-2.5 py-1 text-[11px] font-bold bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-400 cursor-pointer transition-colors"
+                title="Memicu Alarm Sensor Asap Rumah"
+              >
+                🔥 Uji Asap
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Tab 1: Health Monitoring (Default) */}
         {activeTab === 'dashboard' && (
           <>
@@ -200,9 +313,15 @@ export const App: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-4 bg-neutral-50 border border-neutral-300 space-y-2">
                 <span className="font-bold text-neutral-900 block">Sesi Perangkat yang Sedang Aktif:</span>
-                <div>• Token ID Jam: <code className="bg-neutral-200 px-1.5 py-0.5 font-bold font-mono">{session?.token}</code></div>
-                <div>• Nama Lansia: <strong>{session?.patient_name}</strong> (ID: {session?.patient_id})</div>
-                <div>• Model Jam: <code className="bg-neutral-200 px-1.5 py-0.5">Huawei Smart Health Band Pro</code></div>
+                <div>
+                  • Token ID Jam: <code className="bg-neutral-200 px-1.5 py-0.5 font-bold font-mono">{session?.token}</code>
+                </div>
+                <div>
+                  • Nama Lansia: <strong>{session?.patient_name}</strong> (ID: {session?.patient_id})
+                </div>
+                <div>
+                  • Model Jam: <code className="bg-neutral-200 px-1.5 py-0.5">Huawei Smart Health Band Pro</code>
+                </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => setIsAuthModalOpen(true)}
