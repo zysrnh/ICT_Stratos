@@ -133,6 +133,25 @@ export const App: React.FC = () => {
     loadAllData();
   };
 
+  const handleResetNormal = async () => {
+    // 1. Selesaikan semua kejadian darurat yang masih aktif di database
+    for (const ev of events) {
+      if (ev.status === 'PENDING' || ev.status === 'ESCALATED') {
+        await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
+      }
+    }
+    // 2. Injeksi telemetri normal (HR 72, Asap aman 310 ADC, Suhu 27.0)
+    await sendSimulatedTelemetry({
+      heart_rate: 72,
+      steps: simSteps,
+      activity: 'REST',
+      room_temp: 27.0,
+      humidity: 60,
+      smoke_adc: 310,
+    });
+    loadAllData();
+  };
+
   // Layar Penuh Gerbang Pairing jika belum login
   if (!session) {
     return (
@@ -225,6 +244,13 @@ export const App: React.FC = () => {
               title="Memicu sensor asap rumah"
             >
               🔥 Asap
+            </button>
+            <button
+              onClick={handleResetNormal}
+              className="px-2 py-1 text-[11px] font-bold bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 transition-colors cursor-pointer rounded-none"
+              title="Kembalikan semua status dan alarm ke kondisi Normal"
+            >
+              ✅ Reset Normal
             </button>
           </div>
         </div>

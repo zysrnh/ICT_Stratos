@@ -487,8 +487,13 @@ void raiseAlert(AlertKind k, float v, const char* sev, bool sim) {
 }
 
 void onOkPressed() {
-  if (phase == P_VERIFY) { cancelledCount++; clearAlert("CANCELLED"); }
-  else if (phase == P_ESCALATED && curKind != K_SMOKE) clearAlert("RESOLVED");
+  cancelledCount++;
+  simSmoke = false;
+  smokeEma = 320.0f;
+  hrOverride = 72;
+  noTone(BUZZER_PIN);
+  clearAlert(phase == P_VERIFY ? "CANCELLED" : "RESOLVED");
+  Serial.println("[OK] Alarm dibatalkan & status dinormalkan (HR=72, Asap Aman)!");
 }
 
 void updateAlertLogic(unsigned long now) {
@@ -622,7 +627,14 @@ void runCmd(char* s) {
   if      (!strcmp(s, "fall"))  { raiseAlert(K_FALL, 3.0f, "CRITICAL", true); }
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
   else if (!strcmp(s, "smoke")) { simSmoke = true; }
-  else if (!strcmp(s, "clear")) { simSmoke = false; }
+  else if (!strcmp(s, "clear") || !strcmp(s, "normal") || !strcmp(s, "reset") || !strcmp(s, "aman")) {
+    simSmoke = false;
+    smokeEma = 320.0f;
+    hrOverride = 72;
+    noTone(BUZZER_PIN);
+    clearAlert("RESOLVED");
+    Serial.println("[SIM] SEMUA STATUS DI-RESET KE NORMAL (Aman, HR=72, Alarm Mati)");
+  }
   else if (!strcmp(s, "ok") || !strcmp(s, "bypass")) {
     activateBypass();
   }
