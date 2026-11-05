@@ -137,14 +137,14 @@ unsigned long fallT = 0;
 float fallPeak = 0, fallDev = 0;
 
 float hrEma = 70;
-int   hrNow = 70, hrOverride = -1, hrLevelNow = 0;
+int   hrNow = 72, hrOverride = 72, hrLevelNow = 0; // Default boot normal 72 BPM
 unsigned long hrAbnSince = 0, hrCooldownUntil = 0;
 
 float roomTemp = NAN, roomHum = NAN;
 bool  dhtOk = false;
-float smokeEma = 0;
+float smokeEma = 310.0f; // Default boot aman 310 ADC (Udara Bersih)
 bool  simSmoke = false;
-int   smokeOverride = -1; // -1: baca sensor fisik 35, >= 0: software override
+int   smokeOverride = 310; // Default boot aman 310 ADC (Anti-alarm palsu Wokwi)
 
 uint16_t cancelledCount = 0;   // jumlah alarm dibatalkan lansia
 
@@ -698,6 +698,8 @@ void runCmd(char* s) {
   else if (!strncmp(s, "token ", 6)) {
     if (!strcmp(s + 6, "new")) {
       snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
+      isPaired = false;
+      strlcpy(pairedPatientName, "Menunggu Web...", sizeof(pairedPatientName));
     } else {
       strncpy(activeToken, s + 6, sizeof(activeToken) - 1);
       activeToken[sizeof(activeToken) - 1] = '\0';
@@ -825,6 +827,7 @@ void setup() {
   pinMode(BTN_SOS, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
   digitalWrite(BUZZER_PIN, LOW);
+  noTone(BUZZER_PIN);
   digitalWrite(LED_SYNC, LOW);
 
   Wire.begin(21, 22);
