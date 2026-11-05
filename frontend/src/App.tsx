@@ -37,7 +37,6 @@ export const App: React.FC = () => {
   // Sesi Autentikasi / Pairing Perangkat (Tersimpan di Chrome LocalStorage)
   const [session, setSession] = useState<AuthSession | null>(() => getSavedSession());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [simSteps, setSimSteps] = useState<number>(120);
 
   const activePatientId = session?.patient_id ?? 1;
 
@@ -61,47 +60,13 @@ export const App: React.FC = () => {
     }
   }, [session, activePatientId]);
 
-  // 1. Polling data rutin setiap 2.5 detik
+  // 1. Polling data rutin cepat setiap 1 detik (Realtime Stream dari Cloud / Wokwi)
   useEffect(() => {
     if (!session) return;
     loadAllData();
-    const timer = setInterval(loadAllData, 2500);
+    const timer = setInterval(loadAllData, 1000);
     return () => clearInterval(timer);
   }, [session, loadAllData]);
-
-  // 2. Auto-Stream Otomatis di Background (Tanpa Perlu Klik Tombol Manual)
-  // Jika Wokwi/hardware tidak mengirim sinyal selama >4.5 detik, sistem otomatis mengalirkan data
-  useEffect(() => {
-    if (!session) return;
-
-    const autoTimer = setInterval(async () => {
-      // Periksa apakah ada paket telemetry fisik (non-sim) yang baru dalam 4.5 detik terakhir
-      const lastMetric = metrics[0];
-      const lastTime = lastMetric ? new Date(lastMetric.recorded_at).getTime() : 0;
-      const isHardwareFresh = (Date.now() - lastTime) < 4500 && lastMetric?.sim === false;
-
-      // Jika hardware sedang diam/offline, kirim paket latar belakang agar grafik tetap hidup
-      if (!isHardwareFresh) {
-        const nextSteps = simSteps + Math.floor(1 + Math.random() * 3);
-        setSimSteps(nextSteps);
-        try {
-          await sendSimulatedTelemetry({
-            heart_rate: Math.floor(72 + Math.random() * 14),
-            steps: nextSteps,
-            activity: nextSteps % 10 === 0 ? 'WALKING' : 'REST',
-            room_temp: +(26.8 + Math.random() * 0.8).toFixed(1),
-            humidity: +(62 + Math.random() * 3).toFixed(1),
-            smoke_adc: 310 + Math.floor(Math.random() * 35),
-          });
-          loadAllData();
-        } catch (e) {
-          console.error('[AutoStream Background Tick Error]:', e);
-        }
-      }
-    }, 3000);
-
-    return () => clearInterval(autoTimer);
-  }, [session, metrics, simSteps, loadAllData]);
 
   const handleAuthSuccess = (newSession: AuthSession) => {
     setSession(newSession);
@@ -129,27 +94,57 @@ export const App: React.FC = () => {
   };
 
   const handleTriggerSim = async (type: 'FALL' | 'SOS' | 'SMOKE') => {
-    await triggerSimulatedEvent(type, 'ESCALATED', type === 'SMOKE' ? 2800 : 3.5);
-    loadAllData();
+    try {
+      if (type === 'FALL') {
+        await triggerSimulatedEvent('FALL', 'ESCALATED', 3.5);
+        await sendSimulatedTelemetry({
+          heart_rate: 116,
+          activity: 'FALL',
+          steps: latestWatchMetric?.steps ?? 0,
+        });
+      } else if (type === 'SOS') {
+        await triggerSimulatedEvent('SOS', 'ESCALATED', 1.0);
+        await sendSimulatedTelemetry({
+          heart_rate: 124,
+          activity: 'REST',
+          steps: latestWatchMetric?.steps ?? 0,
+        });
+      } else if (type === 'SMOKE') {
+        await triggerSimulatedEvent('SMOKE', 'ESCALATED', 3200);
+        await sendSimulatedTelemetry({
+          smoke_adc: 3200,
+          room_temp: 33.2,
+          heart_rate: latestWatchMetric?.heart_rate ?? 76,
+          steps: latestWatchMetric?.steps ?? 0,
+        });
+      }
+      await loadAllData();
+    } catch (err) {
+      console.error('[Trigger Sim Error]:', err);
+    }
   };
 
   const handleResetNormal = async () => {
-    // 1. Selesaikan semua kejadian darurat yang masih aktif di database
-    for (const ev of events) {
-      if (ev.status === 'PENDING' || ev.status === 'ESCALATED') {
-        await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
+    try {
+      // 1. Selesaikan semua kejadian darurat yang masih aktif di database
+      for (const ev of events) {
+        if (ev.status === 'PENDING' || ev.status === 'ESCALATED') {
+          await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
+        }
       }
+      // 2. Injeksi telemetri normal (HR 72, Asap aman 310 ADC, Suhu 27.0)
+      await sendSimulatedTelemetry({
+        heart_rate: 72,
+        steps: latestWatchMetric?.steps ?? 0,
+        activity: 'REST',
+        room_temp: 27.0,
+        humidity: 60,
+        smoke_adc: 310,
+      });
+      await loadAllData();
+    } catch (err) {
+      console.error('[Reset Normal Error]:', err);
     }
-    // 2. Injeksi telemetri normal (HR 72, Asap aman 310 ADC, Suhu 27.0)
-    await sendSimulatedTelemetry({
-      heart_rate: 72,
-      steps: simSteps,
-      activity: 'REST',
-      room_temp: 27.0,
-      humidity: 60,
-      smoke_adc: 310,
-    });
-    loadAllData();
   };
 
   // Layar Penuh Gerbang Pairing jika belum login
@@ -208,49 +203,87 @@ export const App: React.FC = () => {
           onLogout={handleLogout}
         />
 
-        {/* Sub-bar Status Auto-Stream & Pengujian Darurat (Flat Minimalist) */}
-        <div className="mb-5 px-3 py-2 bg-white border border-neutral-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-bold text-neutral-800 uppercase tracking-wider">
-              Live Biometrics Auto-Stream
-            </span>
-            <span className="text-[10px] text-neutral-400 hidden sm:inline">
-              — Aliran otomatis aktif untuk {session?.patient_name} ({session?.token})
-            </span>
+        {/* Panel Status Sinkronisasi Realtime & Pengujian Darurat */}
+        <div className="mb-6 bg-white border-2 border-neutral-900 p-3 sm:p-4 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-neutral-200">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-3 w-3 bg-emerald-600"></span>
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                    SINKRONISASI REALTIME AKTIF (1 DETIK)
+                  </span>
+                  <span className="text-[10px] bg-neutral-900 text-white font-mono px-1.5 py-0.5">
+                    {session?.token}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  Terhubung ke <strong>{session?.patient_name}</strong> • Data biometrik diperbarui langsung dari ESP32 Wokwi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-neutral-500 text-[11px]">Status Darurat:</span>
+              {activeAlertCount > 0 ? (
+                <span className="bg-rose-600 text-white font-bold px-2 py-0.5 text-[10px] uppercase animate-pulse">
+                  🚨 {activeAlertCount} Kejadian Darurat Aktif!
+                </span>
+              ) : (
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 text-[10px] uppercase">
+                  ✓ Semua Normal & Aman
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 ml-auto">
-            <span className="text-[10px] font-bold text-neutral-400 uppercase hidden sm:inline mr-1">
-              Uji Coba:
+          {/* Tombol-tombol Uji Coba yang Jelas, Kontras & Informatif */}
+          <div className="pt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-black text-neutral-700 uppercase tracking-wider mr-1">
+              UJI SKENARIO:
             </span>
+
             <button
+              type="button"
               onClick={() => handleTriggerSim('FALL')}
-              className="px-2 py-1 text-[11px] font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition-colors cursor-pointer rounded-none"
-              title="Memicu simulasi deteksi jatuh"
+              className="px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-500 transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Simulasikan lansia terjatuh (Benturan IMU MPU6050)"
             >
-              🚨 Jatuh
+              <span>🚨 Uji Jatuh</span>
+              <span className="text-[10px] text-amber-700 font-normal hidden sm:inline">(Impact 3.5G)</span>
             </button>
+
             <button
+              type="button"
               onClick={() => handleTriggerSim('SOS')}
-              className="px-2 py-1 text-[11px] font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition-colors cursor-pointer rounded-none"
-              title="Memicu tombol SOS darurat"
+              className="px-3 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-900 border-2 border-rose-500 transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Simulasikan penekanan tombol fisik SOS di jam tangan"
             >
-              🆘 SOS
+              <span>🆘 Uji Tombol SOS</span>
+              <span className="text-[10px] text-rose-700 font-normal hidden sm:inline">(Panik)</span>
             </button>
+
             <button
+              type="button"
               onClick={() => handleTriggerSim('SMOKE')}
-              className="px-2 py-1 text-[11px] font-semibold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition-colors cursor-pointer rounded-none"
-              title="Memicu sensor asap rumah"
+              className="px-3 py-1.5 text-xs font-bold bg-orange-50 hover:bg-orange-100 text-orange-900 border-2 border-orange-500 transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Simulasikan sensor asap/gas MQ-2 terdeteksi pekat"
             >
-              🔥 Asap
+              <span>🔥 Uji Kebakaran / Asap</span>
+              <span className="text-[10px] text-orange-700 font-normal hidden sm:inline">(MQ-2 &gt; 2500)</span>
             </button>
+
             <button
+              type="button"
               onClick={handleResetNormal}
-              className="px-2 py-1 text-[11px] font-bold bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 transition-colors cursor-pointer rounded-none"
-              title="Kembalikan semua status dan alarm ke kondisi Normal"
+              className="ml-auto px-4 py-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white border-2 border-emerald-900 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="Selesaikan semua alarm & kembalikan status ke Normal"
             >
-              ✅ Reset Normal
+              <span>✅ Reset Normal</span>
+              <span className="text-[10px] text-emerald-200 font-normal hidden sm:inline">(Matikan Alarm)</span>
             </button>
           </div>
         </div>
@@ -262,6 +295,7 @@ export const App: React.FC = () => {
             <StatCards
               latestMetric={latestWatchMetric}
               homeMetric={latestHomeMetric}
+              activeEvents={events}
             />
 
             {/* Biometric Chart Full-Width */}

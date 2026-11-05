@@ -1,19 +1,23 @@
 import React from 'react';
 import { Heart, Footprints, Flame, ShieldCheck, AlertTriangle, Radio } from 'lucide-react';
-import type { HealthMetric } from '../types/telemetry';
+import type { HealthMetric, EmergencyEvent } from '../types/telemetry';
 
 interface StatCardsProps {
   latestMetric: HealthMetric | null;
   homeMetric?: HealthMetric | null;
+  activeEvents?: EmergencyEvent[];
 }
 
-export const StatCards: React.FC<StatCardsProps> = ({ latestMetric, homeMetric }) => {
+export const StatCards: React.FC<StatCardsProps> = ({ latestMetric, homeMetric, activeEvents = [] }) => {
   const hasWatchData = Boolean(latestMetric && latestMetric.heart_rate !== null && latestMetric.heart_rate !== undefined);
   const hr = hasWatchData ? latestMetric!.heart_rate : null;
   const steps = hasWatchData ? (latestMetric!.steps ?? 0) : null;
   const activity = hasWatchData ? (latestMetric!.activity ?? 'REST') : 'OFFLINE';
-  const status = hasWatchData ? (latestMetric!.health_status ?? 'NORMAL') : 'STANDBY';
+  const metricStatus = hasWatchData ? (latestMetric!.health_status ?? 'NORMAL') : 'STANDBY';
   const cancelledAlerts = hasWatchData ? (latestMetric!.fall_cancelled ?? 0) : 0;
+
+  // Cek apakah ada kejadian darurat aktif (PENDING atau ESCALATED)
+  const activeEmerg = activeEvents.find((e) => e.status === 'PENDING' || e.status === 'ESCALATED');
 
   // Node keselamatan rumah
   const hasHomeData = Boolean(
@@ -22,10 +26,22 @@ export const StatCards: React.FC<StatCardsProps> = ({ latestMetric, homeMetric }
   );
   const roomTemp = homeMetric?.room_temp ?? latestMetric?.room_temp ?? null;
   const smokeAdc = homeMetric?.smoke_adc ?? latestMetric?.smoke_adc ?? null;
-  const smokeStatus = homeMetric?.smoke_status ?? latestMetric?.smoke_status ?? 'NORMAL';
+  const rawSmokeStatus = homeMetric?.smoke_status ?? latestMetric?.smoke_status ?? 'NORMAL';
+  const smokeStatus = activeEmerg?.event_type === 'SMOKE' ? 'ALERT' : rawSmokeStatus;
 
-  const isCritical = status === 'CRITICAL' || smokeStatus === 'ALERT';
-  const isWarning = status === 'WARNING';
+  const isCritical = Boolean(activeEmerg) || metricStatus === 'CRITICAL' || smokeStatus === 'ALERT';
+  const isWarning = !isCritical && metricStatus === 'WARNING';
+
+  // Label status EWS yang dinamis & jelas saat simulasi aktif
+  const displayStatus = activeEmerg
+    ? activeEmerg.event_type === 'FALL'
+      ? 'JATUH (DARURAT)'
+      : activeEmerg.event_type === 'SOS'
+      ? 'SOS (PANIK)'
+      : activeEmerg.event_type === 'SMOKE'
+      ? 'ASAP (BAHAYA)'
+      : 'DARURAT'
+    : metricStatus;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-6">
@@ -153,19 +169,19 @@ export const StatCards: React.FC<StatCardsProps> = ({ latestMetric, homeMetric }
           </div>
         </div>
         <div className="flex items-baseline gap-1.5 sm:gap-2">
-          <span className={`text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight ${
+          <span className={`text-lg sm:text-2xl lg:text-2xl font-extrabold tracking-tight ${
             !hasWatchData ? 'text-neutral-400' :
-            isCritical ? 'text-rose-600' :
+            isCritical ? 'text-rose-600 animate-pulse' :
             isWarning ? 'text-amber-600' :
             'text-emerald-700'
           }`}>
-            {status}
+            {displayStatus}
           </span>
         </div>
         <div className="mt-2.5 sm:mt-3 pt-2.5 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 text-[11px] sm:text-xs text-neutral-500">
           <span className="truncate">Sistem EWS</span>
-          <span className="font-semibold text-neutral-700 shrink-0">
-            {hasWatchData ? (cancelledAlerts > 0 ? `${cancelledAlerts}x Batal` : 'Siaga Aktif') : 'Menunggu'}
+          <span className={`font-semibold shrink-0 ${activeEmerg ? 'text-rose-600 font-black' : 'text-neutral-700'}`}>
+            {activeEmerg ? 'Eskalasi Darurat' : hasWatchData ? (cancelledAlerts > 0 ? `${cancelledAlerts}x Batal` : 'Siaga Aktif') : 'Menunggu'}
           </span>
         </div>
       </div>

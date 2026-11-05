@@ -136,8 +136,8 @@ FallState fallState = F_IDLE;
 unsigned long fallT = 0;
 float fallPeak = 0, fallDev = 0;
 
-float hrEma = 70;
-int   hrNow = 72, hrOverride = 72, hrLevelNow = 0; // Default boot normal 72 BPM
+float hrEma = 72;
+int   hrNow = 72, hrOverride = -1, hrLevelNow = 0; // hrOverride = -1: Auto-baca potensiometer (default aman 72 BPM)
 unsigned long hrAbnSince = 0, hrCooldownUntil = 0;
 
 float roomTemp = NAN, roomHum = NAN;
@@ -466,7 +466,9 @@ void netTask(void*) {
           simSmoke = false;
           smokeOverride = 310;
           smokeEma = 310.0f;
-          hrOverride = 72;
+          hrOverride = -1;
+          hrEma = 72.0f;
+          hrNow = 72;
           phase = P_IDLE;
           curKind = K_NONE;
           noTone(BUZZER_PIN);
@@ -677,7 +679,9 @@ void activateBypass() {
   simSmoke = false;
   smokeOverride = 310;
   smokeEma = 310.0f;
-  hrOverride = 72;
+  hrOverride = -1;
+  hrEma = 72.0f;
+  hrNow = 72;
   phase = P_IDLE;
   curKind = K_NONE;
   noTone(BUZZER_PIN);
@@ -695,7 +699,9 @@ void runCmd(char* s) {
     simSmoke = false;
     smokeOverride = 310;
     smokeEma = 310.0f;
-    hrOverride = 72;
+    hrOverride = -1;
+    hrEma = 72.0f;
+    hrNow = 72;
     noTone(BUZZER_PIN);
     clearAlert("RESOLVED");
     Serial.println("[SIM] SEMUA STATUS DI-RESET KE NORMAL (Aman, HR=72, Alarm Mati)");
@@ -942,7 +948,17 @@ void loop() {
   // --- HR 10 Hz ---
   if (now - lastHr >= 100) {
     lastHr = now;
-    float target = (hrOverride > 0) ? (float)hrOverride : (float)map(analogRead(POT_PIN), 0, 4095, 45, 150);
+    int rawPot = analogRead(POT_PIN);
+    float target;
+    if (hrOverride > 0) {
+      target = (float)hrOverride;
+    } else if (rawPot <= 15) {
+      // Jika potensiometer di posisi 0 (belum diputar di Wokwi), gunakan detak jantung normal 72 BPM
+      target = 72.0f;
+    } else {
+      // Potensiometer disentuh / diputar di Wokwi: petakan ke 55 .. 145 BPM
+      target = (float)map(rawPot, 16, 4095, 55, 145);
+    }
     hrEma += 0.15f * (target - hrEma);
     hrNow = (int)(hrEma + 0.5f);
     evalHr(now);
