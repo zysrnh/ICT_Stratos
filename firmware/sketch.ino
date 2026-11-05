@@ -881,5 +881,5 @@ void loop() {
   updateBuzzer(now);
 
   if (now - lastUi >= 250) { lastUi = now; drawUI(now); }
-  if (now - lastTel >= 3500) { lastTel = now; sendTelemetry(); }
+  if (now - lastTel >= 3000) { lastTel = now; sendTelemetry(); }
 }

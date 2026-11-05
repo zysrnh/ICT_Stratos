@@ -17,7 +17,7 @@ interface NavProps {
   onLogout?: () => void;
 }
 
-// 1. Sidebar Khusus Layar Tablet & Desktop (>= md)
+// 1. Sidebar Khusus Layar Tablet & Desktop (>= md) - Flat Minimalist
 export const Sidebar: React.FC<NavProps> = ({
   activeTab,
   setActiveTab,
@@ -28,23 +28,23 @@ export const Sidebar: React.FC<NavProps> = ({
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Health Biometrics' },
     { id: 'home', icon: ShieldAlert, label: 'Home Safety & Events', badge: alertCount },
-    { id: 'companion', icon: Bot, label: 'AI Companion & Reminders' },
-    { id: 'family', icon: Users2, label: 'Family & Data Privacy' },
+    { id: 'companion', icon: Bot, label: 'AI Companion' },
+    { id: 'family', icon: Users2, label: 'Family & Consent' },
     { id: 'settings', icon: Settings, label: 'Pengaturan Sistem' },
   ];
 
   return (
-    <aside className="hidden md:flex w-20 lg:w-22 flex-col items-center py-6 px-3 bg-[#111111] text-white rounded-[32px] my-3 ml-3 shadow-xl shrink-0 select-none">
+    <aside className="hidden md:flex w-20 lg:w-22 flex-col items-center py-6 px-2 bg-[#111111] text-white rounded-none border-r border-neutral-800 shrink-0 select-none">
       {/* Brand Icon / Logo Huawei Health Ecosystem */}
       <div className="mb-8 flex flex-col items-center">
-        <div className="w-12 h-12 rounded-2xl bg-white text-[#111111] flex items-center justify-center font-extrabold text-2xl tracking-tighter shadow-md">
+        <div className="w-11 h-11 rounded-none bg-white text-[#111111] flex items-center justify-center font-extrabold text-xl tracking-tighter shadow-xs">
           H.
         </div>
-        <span className="text-[9px] font-semibold tracking-wider text-neutral-400 mt-1 uppercase">ECA</span>
+        <span className="text-[9px] font-bold tracking-wider text-neutral-400 mt-1.5 uppercase">ECA</span>
       </div>
 
       {/* Nav Menu Icons */}
-      <nav className="flex-1 flex flex-col items-center gap-4 w-full">
+      <nav className="flex-1 flex flex-col items-center gap-3 w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -53,15 +53,15 @@ export const Sidebar: React.FC<NavProps> = ({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={item.label}
-              className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+              className={`relative w-12 h-12 rounded-none flex items-center justify-center transition-colors cursor-pointer border ${
                 isActive
-                  ? 'bg-white text-[#111111] shadow-md scale-105'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800/60'
+                  ? 'bg-white text-[#111111] border-white font-bold'
+                  : 'text-neutral-400 border-transparent hover:text-white hover:bg-neutral-900'
               }`}
             >
-              <Icon className="w-5 h-5 stroke-[2.2]" />
+              <Icon className="w-5 h-5 stroke-[2]" />
               {item.badge && item.badge > 0 ? (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#DC2626] text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#111111] animate-pulse">
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-bold rounded-none flex items-center justify-center">
                   {item.badge}
                 </span>
               ) : null}
@@ -71,22 +71,22 @@ export const Sidebar: React.FC<NavProps> = ({
       </nav>
 
       {/* Bottom Profile / Pairing Token Access & Disconnect */}
-      <div className="mt-auto pt-4 border-t border-neutral-800/80 w-full flex flex-col items-center gap-2">
+      <div className="mt-auto pt-4 border-t border-neutral-800 w-full flex flex-col items-center gap-2">
         <button
           onClick={onOpenAuth}
           title="Ganti Jam Tangan / Token ID"
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-800/60 transition-colors cursor-pointer"
+          className="w-10 h-10 rounded-none flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
         >
-          <KeyRound className="w-4 h-4 stroke-[2]" />
+          <KeyRound className="w-4 h-4" />
         </button>
 
         {onLogout && (
           <button
             onClick={onLogout}
             title="Putuskan Jam / Keluar"
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-950/40 transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-none flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-neutral-900 transition-colors cursor-pointer"
           >
-            <LogOut className="w-4 h-4 stroke-[2]" />
+            <LogOut className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<NavProps> = ({
   );
 };
 
-// 2. Bottom Navigation Bar Khusus Mobile (< md)
+// 2. Docked Bottom Navigation Bar Khusus Mobile (< md) - Flat Docked Bar Anti Menutupi Konten
 export const BottomNav: React.FC<NavProps> = ({
   activeTab,
   setActiveTab,
@@ -107,11 +107,11 @@ export const BottomNav: React.FC<NavProps> = ({
     { id: 'home', icon: ShieldAlert, label: 'Safety', badge: alertCount },
     { id: 'companion', icon: Bot, label: 'AI' },
     { id: 'family', icon: Users2, label: 'Family' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'settings', icon: Settings, label: 'Config' },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-4 left-4 right-4 bg-[#111111] text-white rounded-3xl p-2.5 shadow-2xl flex items-center justify-around z-50 border border-neutral-800/80">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#111111] text-white rounded-none py-1.5 px-1 z-50 border-t border-neutral-800 flex items-center justify-around select-none">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
@@ -119,14 +119,16 @@ export const BottomNav: React.FC<NavProps> = ({
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-all duration-200 cursor-pointer ${
-              isActive ? 'bg-white text-[#111111] font-semibold' : 'text-neutral-400 hover:text-white'
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-none transition-colors cursor-pointer ${
+              isActive
+                ? 'text-white font-bold bg-neutral-900 border-b-2 border-white'
+                : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Icon className="w-5 h-5 stroke-[2.2]" />
+            <Icon className="w-4 h-4" />
             <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
             {item.badge && item.badge > 0 ? (
-              <span className="absolute -top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#111111] animate-pulse">
+              <span className="absolute top-0 right-1 w-3.5 h-3.5 bg-red-600 text-white text-[8px] font-bold rounded-none flex items-center justify-center">
                 {item.badge}
               </span>
             ) : null}
@@ -138,9 +140,9 @@ export const BottomNav: React.FC<NavProps> = ({
       <button
         onClick={onOpenAuth}
         title="Ganti Jam"
-        className="flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-neutral-400 hover:text-white transition-all cursor-pointer"
+        className="flex flex-col items-center justify-center py-1 px-2 rounded-none text-neutral-400 hover:text-white transition-colors cursor-pointer"
       >
-        <KeyRound className="w-5 h-5 stroke-[2.2]" />
+        <KeyRound className="w-4 h-4" />
         <span className="text-[10px] mt-0.5 tracking-tight">Token</span>
       </button>
 
@@ -148,12 +150,14 @@ export const BottomNav: React.FC<NavProps> = ({
         <button
           onClick={onLogout}
           title="Keluar"
-          className="flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-red-400 hover:text-red-300 transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center py-1 px-2 rounded-none text-red-400 hover:text-red-300 transition-colors cursor-pointer"
         >
-          <LogOut className="w-5 h-5 stroke-[2.2]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Exit</span>
+          <LogOut className="w-4 h-4" />
+          <span className="text-[10px] mt-0.5 tracking-tight">Keluar</span>
         </button>
       )}
     </nav>
   );
 };
+
+export default Sidebar;

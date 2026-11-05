@@ -47,17 +47,17 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 pb-6">
       {/* 1. Header Ringkasan Pilar 2 */}
-      <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white rounded-none p-4 sm:p-6 border border-neutral-200 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 text-[#111111] text-xs font-bold uppercase tracking-wider mb-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-none bg-neutral-100 text-[#111111] text-[11px] font-bold uppercase tracking-wider mb-2">
               <Sparkles className="w-3.5 h-3.5 text-neutral-800" />
-              <span>Pilar 2: Home Safety & Environmental Node</span>
+              <span>Pilar 2: Home Safety &amp; Environmental Node</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111] tracking-tight">
-              Pemantauan Keamanan Rumah & Deteksi Jatuh
+              Pemantauan Keamanan Rumah &amp; Deteksi Jatuh
             </h2>
             <p className="text-xs sm:text-sm text-neutral-500 mt-1 max-w-2xl">
               Node keamanan mandiri (ECA-HOME-001) memantau sensor asap gas MQ-2 dan suhu/kelembaban ruangan,
@@ -66,29 +66,30 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-none bg-emerald-500"></span>
             <span className="text-xs font-bold text-neutral-600">Dual Node Online</span>
           </div>
         </div>
 
         {/* 3 Metric Cards Rumah */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-5">
           {/* Sensor Asap MQ-2 */}
-          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/60">
+          <div className="p-4 rounded-none bg-white border border-neutral-200 shadow-xs">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-neutral-500">Sensor Gas/Asap (MQ-2)</span>
               <Flame className={`w-4 h-4 ${smokeStatus === 'ALERT' ? 'text-rose-600' : 'text-neutral-400'}`} />
             </div>
             <div className="text-2xl font-black text-[#111111]">{smokeAdc} ADC</div>
             <div className="mt-2 text-xs font-semibold">
-              Status: <span className={smokeStatus === 'ALERT' ? 'text-rose-600 font-bold' : 'text-emerald-600'}>
+              Status:{' '}
+              <span className={smokeStatus === 'ALERT' ? 'text-rose-600 font-bold' : 'text-emerald-600'}>
                 {smokeStatus === 'ALERT' ? 'KONSENTRASI TINGGI' : 'Aman / Normal'}
               </span>
             </div>
           </div>
 
           {/* Suhu Ruangan & Kelembaban */}
-          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/60">
+          <div className="p-4 rounded-none bg-white border border-neutral-200 shadow-xs">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-neutral-500">Iklim Ruangan (DHT22)</span>
               <Thermometer className="w-4 h-4 text-neutral-400" />
@@ -101,7 +102,7 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
           </div>
 
           {/* Akselerometer Jatuh MPU6050 */}
-          <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/60">
+          <div className="p-4 rounded-none bg-white border border-neutral-200 shadow-xs">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-neutral-500">Akselerasi Gerak (MPU6050)</span>
               <Activity className="w-4 h-4 text-neutral-400" />
@@ -115,30 +116,30 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
       </div>
 
       {/* 2. Interactive Demonstration Panel */}
-      <div className="bg-[#111111] text-white rounded-none p-6 shadow-xl border-2 border-neutral-900">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+      <div className="bg-[#111111] text-white rounded-none p-4 sm:p-6 shadow-xs border border-neutral-800">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
           <div>
             <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
               Live Evaluation Tool
             </span>
-            <h3 className="text-lg font-bold">Simulator & Uji Respons Darurat</h3>
+            <h3 className="text-base sm:text-lg font-bold">Simulator &amp; Uji Respons Darurat</h3>
           </div>
-          <span className="text-xs bg-neutral-800 text-neutral-300 px-3 py-1 rounded-none border border-neutral-700">
+          <span className="text-[11px] bg-neutral-900 text-neutral-300 px-2.5 py-0.5 rounded-none border border-neutral-700">
             Emergency Simulator Tool
           </span>
         </div>
-        <p className="text-xs text-neutral-400 mb-5 max-w-xl">
+        <p className="text-xs text-neutral-400 mb-4 max-w-xl">
           Gunakan tombol di bawah ini untuk mensimulasikan kejadian darurat secara terkontrol.
           Sistem akan mendemonstrasikan alur verifikasi jam tangan hingga eskalasi ke kontak keluarga.
         </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <button
             onClick={() => handleSimulate('FALL', 'PENDING', 3.4)}
             disabled={isTriggering !== null}
-            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/80 transition-all cursor-pointer text-center"
+            className="flex flex-col items-center justify-center p-3 rounded-none bg-neutral-900 border border-neutral-700 hover:border-neutral-400 hover:bg-neutral-800 transition-colors cursor-pointer text-center"
           >
-            <Play className="w-5 h-5 text-amber-400 mb-1" />
+            <Play className="w-4 h-4 text-amber-400 mb-1" />
             <span className="text-xs font-bold">Picu Jatuh</span>
             <span className="text-[10px] text-neutral-400">Verifikasi 15 detik</span>
           </button>
@@ -146,9 +147,9 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
           <button
             onClick={() => handleSimulate('SOS', 'ESCALATED', 0)}
             disabled={isTriggering !== null}
-            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/80 transition-all cursor-pointer text-center"
+            className="flex flex-col items-center justify-center p-3 rounded-none bg-neutral-900 border border-neutral-700 hover:border-neutral-400 hover:bg-neutral-800 transition-colors cursor-pointer text-center"
           >
-            <Play className="w-5 h-5 text-rose-500 mb-1" />
+            <Play className="w-4 h-4 text-rose-500 mb-1" />
             <span className="text-xs font-bold">Tombol SOS</span>
             <span className="text-[10px] text-neutral-400">Langsung Eskalasi</span>
           </button>
@@ -156,9 +157,9 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
           <button
             onClick={() => handleSimulate('SMOKE', 'ESCALATED', 3200)}
             disabled={isTriggering !== null}
-            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/80 transition-all cursor-pointer text-center"
+            className="flex flex-col items-center justify-center p-3 rounded-none bg-neutral-900 border border-neutral-700 hover:border-neutral-400 hover:bg-neutral-800 transition-colors cursor-pointer text-center"
           >
-            <Play className="w-5 h-5 text-orange-400 mb-1" />
+            <Play className="w-4 h-4 text-orange-400 mb-1" />
             <span className="text-xs font-bold">Bahaya Asap MQ2</span>
             <span className="text-[10px] text-neutral-400">Alarm Rumah 3000Hz</span>
           </button>
@@ -166,9 +167,9 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
           <button
             onClick={() => handleSimulate('FALL', 'RESOLVED', 0)}
             disabled={isTriggering !== null}
-            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/80 transition-all cursor-pointer text-center"
+            className="flex flex-col items-center justify-center p-3 rounded-none bg-neutral-900 border border-neutral-700 hover:border-neutral-400 hover:bg-neutral-800 transition-colors cursor-pointer text-center"
           >
-            <RotateCcw className="w-5 h-5 text-emerald-400 mb-1" />
+            <RotateCcw className="w-4 h-4 text-emerald-400 mb-1" />
             <span className="text-xs font-bold">Reset Status</span>
             <span className="text-[10px] text-neutral-400">Kembalikan Normal</span>
           </button>
@@ -176,51 +177,51 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
       </div>
 
       {/* 3. Log Riwayat Kejadian Darurat */}
-      <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
+      <div className="bg-white rounded-none p-4 sm:p-6 border border-neutral-200 shadow-xs">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-[#111111]">Riwayat Kejadian & Siklus Eskalasi</h3>
+          <h3 className="text-base font-bold text-[#111111]">Riwayat Kejadian &amp; Siklus Eskalasi</h3>
           <span className="text-xs font-semibold text-neutral-400">Total: {events.length} Kejadian</span>
         </div>
 
         {events.length === 0 ? (
-          <div className="py-12 text-center text-neutral-400 text-sm">
+          <div className="py-10 text-center text-neutral-400 text-xs">
             Belum ada catatan kejadian darurat. Sistem dalam keadaan kondusif.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-neutral-100 text-neutral-400 uppercase tracking-wider font-semibold">
-                  <th className="py-3 px-3">Waktu</th>
-                  <th className="py-3 px-3">Tipe Event</th>
-                  <th className="py-3 px-3">Perangkat</th>
-                  <th className="py-3 px-3">Keparahan</th>
-                  <th className="py-3 px-3">Status Penanganan</th>
-                  <th className="py-3 px-3">Eskalasi Penerima</th>
+                <tr className="border-b border-neutral-200 text-neutral-500 uppercase tracking-wider font-semibold">
+                  <th className="py-2.5 px-3">Waktu</th>
+                  <th className="py-2.5 px-3">Tipe Event</th>
+                  <th className="py-2.5 px-3">Perangkat</th>
+                  <th className="py-2.5 px-3">Keparahan</th>
+                  <th className="py-2.5 px-3">Status Penanganan</th>
+                  <th className="py-2.5 px-3">Eskalasi Penerima</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {events.map((ev) => (
-                  <tr key={ev.id || ev.event_id} className="hover:bg-neutral-50/70 transition-colors">
-                    <td className="py-3 px-3 text-neutral-500 font-medium">
+                  <tr key={ev.id || ev.event_id} className="hover:bg-neutral-50 transition-colors">
+                    <td className="py-2.5 px-3 text-neutral-500 font-medium">
                       {new Date(ev.created_at).toLocaleTimeString('id-ID', {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
                       })}
                     </td>
-                    <td className="py-3 px-3 font-bold text-neutral-900">
+                    <td className="py-2.5 px-3 font-bold text-neutral-900">
                       {ev.event_type}
                       {ev.sim ? (
-                        <span className="ml-1.5 text-[9px] font-semibold bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded">
+                        <span className="ml-1.5 text-[9px] font-semibold bg-neutral-100 text-neutral-600 px-1 py-0.2 rounded-none">
                           SIM
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-3 px-3 text-neutral-600">{ev.device_id}</td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3 text-neutral-600 font-mono text-[11px]">{ev.device_id}</td>
+                    <td className="py-2.5 px-3">
                       <span
-                        className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
+                        className={`font-bold px-2 py-0.5 rounded-none text-[10px] ${
                           ev.severity === 'CRITICAL'
                             ? 'bg-rose-100 text-rose-700'
                             : 'bg-amber-100 text-amber-700'
@@ -229,9 +230,9 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
                         {ev.severity}
                       </span>
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3">
                       <span
-                        className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
+                        className={`font-bold px-2 py-0.5 rounded-none text-[10px] ${
                           ev.status === 'ESCALATED'
                             ? 'bg-rose-100 text-rose-800'
                             : ev.status === 'PENDING'
@@ -244,7 +245,7 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
                         {ev.status}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-neutral-600 font-medium">
+                    <td className="py-2.5 px-3 text-neutral-600 font-medium">
                       {ev.escalated_to || 'Level 1: Jam Tangan'}
                     </td>
                   </tr>
@@ -257,3 +258,5 @@ export const HomeSafetyView: React.FC<HomeSafetyProps> = ({
     </div>
   );
 };
+
+export default HomeSafetyView;
