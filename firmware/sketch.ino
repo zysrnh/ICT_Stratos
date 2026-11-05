@@ -18,7 +18,7 @@
   Semua event dari perintah ini ditandai "sim": true.
 */
 
-#include <WiFi.h>
+#include <WiFi.h> 
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Wire.h>
@@ -463,6 +463,14 @@ void netTask(void*) {
         lastPairCheck = millis();
         if (checkCloudPairing()) {
           isPaired = true;
+          simSmoke = false;
+          smokeOverride = 310;
+          smokeEma = 310.0f;
+          hrOverride = 72;
+          phase = P_IDLE;
+          curKind = K_NONE;
+          noTone(BUZZER_PIN);
+          digitalWrite(BUZZER_PIN, LOW);
           Serial.printf("[Cloud] Pairing terdeteksi! Lansia: %s\n", pairedPatientName);
           drawWelcomeScreen();
           vTaskDelay(pdMS_TO_TICKS(2500));
@@ -666,6 +674,14 @@ void activateBypass() {
     }
   }
   isPaired = true;
+  simSmoke = false;
+  smokeOverride = 310;
+  smokeEma = 310.0f;
+  hrOverride = 72;
+  phase = P_IDLE;
+  curKind = K_NONE;
+  noTone(BUZZER_PIN);
+  digitalWrite(BUZZER_PIN, LOW);
   Serial.printf("[PAIRING] Operasional Aktif! Lansia: %s (ID: %d, Token: %s)\n", pairedPatientName, pairedPatientId, activeToken);
   drawWelcomeScreen();
   delay(1500);

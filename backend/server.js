@@ -378,6 +378,10 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(401).json({ error: 'Token perangkat tidak valid atau belum terdaftar.' });
       }
 
+      if (devices[0].patient_name && devices[0].patient_name.startsWith('Lansia (')) {
+        return res.status(401).json({ error: 'Token belum dikonfigurasi profil lansianya.' });
+      }
+
       return res.json({
         success: true,
         auth_type: 'DEVICE_TOKEN',

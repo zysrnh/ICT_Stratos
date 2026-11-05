@@ -12,7 +12,7 @@ import {
   ArrowLeft,
   Watch,
 } from 'lucide-react';
-import { pairDevice } from '../services/api';
+import { pairDevice, loginAuth } from '../services/api';
 import type { AuthSession } from '../types/telemetry';
 import { QrCameraScanner } from './QrCameraScanner';
 
@@ -50,36 +50,85 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       if (urlToken) {
         const clean = urlToken.trim().toUpperCase();
         const code = clean.replace(/^HUAWEI-?ECA-?/i, '').replace(/^ECA-?/i, '');
+        const full = clean.startsWith('HUAWEI-ECA-') ? clean : `HUAWEI-ECA-${code}`;
         setTokenCode(code);
-        setTokenInput(clean.startsWith('HUAWEI-ECA-') ? clean : `HUAWEI-ECA-${code}`);
-        setStep('configure');
+        setTokenInput(full);
+        setLoading(true);
+        loginAuth({ token: full })
+          .then((existingSession) => {
+            if (existingSession && !existingSession.patient_name?.startsWith('Lansia (')) {
+              onSuccess(existingSession);
+              onClose();
+            } else {
+              setStep('configure');
+            }
+          })
+          .catch(() => {
+            setStep('configure');
+          })
+          .finally(() => {
+            setLoading(false);
+          });
       }
     }
   }, []);
 
   if (!isOpen) return null;
 
-  const handleScanSuccess = (scannedToken: string) => {
+  const handleScanSuccess = async (scannedToken: string) => {
     setIsScannerOpen(false);
     const cleaned = scannedToken.trim().toUpperCase();
     const code = cleaned.replace(/^HUAWEI-?ECA-?/i, '').replace(/^ECA-?/i, '');
+    const full = cleaned.startsWith('HUAWEI-ECA-') ? cleaned : `HUAWEI-ECA-${code}`;
     setTokenCode(code);
-    setTokenInput(cleaned.startsWith('HUAWEI-ECA-') ? cleaned : `HUAWEI-ECA-${code}`);
+    setTokenInput(full);
     setErrorMsg(null);
-    setStep('configure');
+    setLoading(true);
+
+    try {
+      const existingSession = await loginAuth({ token: full });
+      if (existingSession && !existingSession.patient_name?.startsWith('Lansia (')) {
+        onSuccess(existingSession);
+        onClose();
+        return;
+      }
+      setStep('configure');
+    } catch {
+      setStep('configure');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleNextToConfig = (e: React.FormEvent) => {
+  const handleNextToConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = tokenCode.trim().toUpperCase();
-    const full = tokenInput.trim() || (cleanCode ? `HUAWEI-ECA-${cleanCode}` : '');
+    const full = tokenInput.trim().toUpperCase() || (cleanCode ? `HUAWEI-ECA-${cleanCode}` : '');
     if (!full || !cleanCode) {
       setErrorMsg('Masukkan 4 karakter kode smartwatch atau scan QR Code.');
       return;
     }
     setTokenInput(full);
     setErrorMsg(null);
-    setStep('configure');
+    setLoading(true);
+
+    try {
+      // 1. Cek apakah token sudah terdaftar di database
+      const existingSession = await loginAuth({ token: full });
+      // Jika berhasil dan pasien bukan placeholder tak bernama, langsung masuk ke Dashboard!
+      if (existingSession && !existingSession.patient_name?.startsWith('Lansia (')) {
+        onSuccess(existingSession);
+        onClose();
+        return;
+      }
+      // Jika masih berupa placeholder, arahkan ke konfigurasi nama
+      setStep('configure');
+    } catch {
+      // Token belum terdaftar di DB -> beralih ke form isi nama profil lansia baru
+      setStep('configure');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -273,9 +322,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    disabled={loading}
+                    className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-600 text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <span>Lanjut ke Atur Profil Lansia</span>
+                    <span>{loading ? 'Memeriksa & Menghubungkan...' : 'Lanjut / Masuk ke Dashboard →'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </form>
