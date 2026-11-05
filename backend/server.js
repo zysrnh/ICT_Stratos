@@ -786,14 +786,18 @@ app.post('/api/telemetry', verifyDeviceOrAuth, async (req, res) => {
 
     // 3. Cek apakah ada kejadian darurat aktif untuk sinkronisasi 2 arah ke ESP32
     const [activeEvs] = await pool.execute(
-      "SELECT id FROM emergency_events WHERE patient_id = ? AND status IN ('PENDING', 'ESCALATED') LIMIT 1",
+      "SELECT id, event_type, severity, status FROM emergency_events WHERE patient_id = ? AND status IN ('PENDING', 'ESCALATED') ORDER BY id DESC LIMIT 1",
       [targetPatientId]
     );
     const hasActiveEmergency = activeEvs.length > 0;
+    const activeEventType = hasActiveEmergency ? activeEvs[0].event_type : null;
+    const activeSeverity = hasActiveEmergency ? activeEvs[0].severity : null;
 
     res.status(201).json({
       success: true,
       has_active_emergency: hasActiveEmergency,
+      active_event_type: activeEventType,
+      active_severity: activeSeverity,
       message: `Telemetri [${type.toUpperCase()}] berhasil disimpan ke RDS`,
       metric_id: result.insertId
     });

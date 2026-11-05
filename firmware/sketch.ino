@@ -419,10 +419,35 @@ int postJson(const char* url, const char* body) {
             simSmoke = false;
             smokeOverride = 310;
             smokeEma = 310.0f;
-            hrOverride = 72;
-            clearAlert("RESOLVED");
+            hrOverride = -1;
+            phase = P_IDLE;
+            curKind = K_NONE;
             noTone(BUZZER_PIN);
-            Serial.println("[Cloud Sync] Web menormalkan status -> Alarm Wokwi mati & kembali NORMAL!");
+            digitalWrite(BUZZER_PIN, LOW);
+            Serial.println("[Cloud Sync ✅] Web menormalkan status -> Alarm Wokwi mati & kembali NORMAL!");
+          } else if (hasEmerg) {
+            const char* evType = doc["active_event_type"] | "SOS";
+            AlertKind targetKind = K_SOS;
+            if (!strcmp(evType, "FALL")) targetKind = K_FALL;
+            else if (!strcmp(evType, "SMOKE")) targetKind = K_SMOKE;
+
+            if (phase == P_IDLE || curKind != targetKind) {
+              Serial.printf("[Cloud Sync 🚨] Web memicu DARURAT (%s)! Mengaktifkan Buzzer & Layar Darurat Wokwi...\n", evType);
+              phase = P_ESCALATED;
+              curSev = "CRITICAL";
+              curKind = targetKind;
+              if (targetKind == K_FALL) {
+                curValue = 3.5f;
+              } else if (targetKind == K_SMOKE) {
+                curValue = 3200.0f;
+                simSmoke = true;
+                smokeOverride = 3200;
+                smokeEma = 3200.0f;
+              } else {
+                curKind = K_SOS;
+                curValue = 1.0f;
+              }
+            }
           }
         }
       }
