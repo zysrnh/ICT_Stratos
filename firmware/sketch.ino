@@ -359,7 +359,7 @@ void queueEvent(AlertKind k, const char* sev, const char* status, float val, boo
   char buf[400];
   serializeJson(d, buf, sizeof(buf));
   enqueueMsg(evtQ, buf);
-  Serial.printf("[EVENT] %s\n", buf);
+  Serial.printf("[ALARM 🚨] %s [%s] - Nilai: %.1f | Status: %s\n", kindName(k), sev, val, status);
 }
 
 void sendTelemetry() {
@@ -388,9 +388,7 @@ void sendTelemetry() {
   serializeJson(d, buf, sizeof(buf));
   enqueueMsg(telQ, buf);
 
-  Serial.printf("[TEL] HR=%d %s steps=%lu g=%.2f | %s | rmh=%.1fC smoke=%d | queue evt=%u\n",
-                hrNow, isActive ? "ACTIVE" : "REST", (unsigned long)steps, lastG, healthStatus(),
-                dhtOk ? roomTemp : -99.0f, (int)smokeEma, (unsigned)uxQueueMessagesWaiting(evtQ));
+
 }
 
 int postJson(const char* url, const char* body) {
@@ -411,7 +409,6 @@ int postJson(const char* url, const char* body) {
   http.addHeader("X-Pinggy-No-Screen", "1");
   int code = http.POST(String(body));
   if (code > 0) {
-    Serial.printf("[Cloud] %s -> HTTP %d\n", url, code);
     if ((code == 200 || code == 201) && http.getSize() != 0) {
       String resp = http.getString();
       StaticJsonDocument<256> doc;
@@ -430,8 +427,19 @@ int postJson(const char* url, const char* body) {
         }
       }
     }
+
+    if (strstr(url, "telemetry")) {
+      if (curKind != K_NONE || strcmp(healthStatus(), "NORMAL") != 0) {
+        Serial.printf("[DARURAT 🚨] Status: %s | HR: %d BPM | Asap: %d ADC | Suhu: %.1f C | Cloud: OK\n",
+                      healthStatus(), hrNow, (int)smokeEma, dhtOk ? roomTemp : 27.0f);
+      } else {
+        Serial.printf("[MONITOR] HR: %d BPM (%s) | Langkah: %lu | Suhu: %.1f C | Asap: %d (Aman) | Cloud: OK\n",
+                      hrNow, hrNow > 100 ? "Takikardia" : hrNow < 50 ? "Bradikardia" : "Normal",
+                      (unsigned long)steps, dhtOk ? roomTemp : 27.0f, (int)smokeEma);
+      }
+    }
   } else {
-    Serial.printf("[Cloud] %s gagal: %s\n", url, http.errorToString(code).c_str());
+    Serial.printf("[WARNING ⚠️] Gagal sinkron ke Cloud (%s)\n", http.errorToString(code).c_str());
   }
   http.end();
   digitalWrite(LED_SYNC, (code >= 200 && code < 300) ? HIGH : LOW);
@@ -631,6 +639,23 @@ void evalHome() {
 // ==========================================
 // Simulator via Serial
 // ==========================================
+void printHelp() {
+  Serial.println("\n=============================================================");
+  Serial.println("         PANDUAN PERINTAH SIMULATOR WOKWI                   ");
+  Serial.println("=============================================================");
+  Serial.println("  normal / reset : Normalkan semua (HR 72, Asap aman, alarm mati)");
+  Serial.println("  fall           : Picu simulasi jatuh (verifikasi 15 detik)");
+  Serial.println("  sos            : Picu tombol darurat SOS (langsung eskalasi)");
+  Serial.println("  smoke          : Picu simulasi sensor asap (3500 ADC)");
+  Serial.println("  clear          : Matikan simulasi asap");
+  Serial.println("  hr <angka>     : Set detak jantung manual (contoh: hr 80)");
+  Serial.println("  hr auto        : Kembalikan detak jantung ke potensiometer");
+  Serial.println("  token          : Cek token aktif saat ini");
+  Serial.println("  token new      : Buat token acak baru");
+  Serial.println("  qr             : Tampilkan ulang QR code di OLED");
+  Serial.println("=============================================================\n");
+}
+
 void activateBypass() {
   Serial.println("[PAIRING] Mencoba sinkronkan data lansia dari Web...");
   if (!checkCloudPairing()) {
@@ -685,8 +710,12 @@ void runCmd(char* s) {
     if (!strcmp(s + 3, "auto")) hrOverride = -1;
     else hrOverride = atoi(s + 3);
   }
-  else Serial.println("[SIM] perintah: fall | sos | smoke | clear | hr <angka> | hr auto | token | token <id> | token new | qr");
-  Serial.printf("[SIM] ok: %s\n", s);
+  else if (!strcmp(s, "help") || !strcmp(s, "?")) {
+    printHelp();
+  }
+  else {
+    Serial.println("[INFO] Ketik 'help' untuk melihat panduan perintah simulator.");
+  }
 }
 
 void handleSerial() {
