@@ -32,7 +32,7 @@
 
 // ==========================================
 // OLED SSD1306 (I2C)
-// ==========================================
+// ========================================== 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -244,7 +244,16 @@ void drawQrCodeScreen() {
   display.setCursor(58, 43);
   display.print("STATUS:");
   display.setCursor(58, 54);
-  display.print(isPaired ? "AKTIF" : "WAIT WEB");
+  static int dots = 0;
+  if (!isPaired) {
+    dots = (dots + 1) % 4;
+    if (dots == 0) display.print("CEK WEB");
+    else if (dots == 1) display.print("CEK WEB.");
+    else if (dots == 2) display.print("CEK WEB..");
+    else display.print("CEK WEB...");
+  } else {
+    display.print("AKTIF");
+  }
 
   display.display();
 }
@@ -281,7 +290,10 @@ void drawWelcomeScreen() {
 
 // Cek status pairing ke Cloud Backend
 bool checkCloudPairing() {
-  if (WiFi.status() != WL_CONNECTED) return false;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[Cloud] Menunggu WiFi Wokwi terhubung...");
+    return false;
+  }
 
 #if USE_HTTPS
   WiFiClientSecure client;
@@ -292,8 +304,8 @@ bool checkCloudPairing() {
   HTTPClient http;
   String url = String(API_BASE) + "/api/device/check-pair?token=" + activeToken;
   http.begin(client, url);
-  http.setConnectTimeout(2500);
-  http.setTimeout(3000);
+  http.setConnectTimeout(5000);
+  http.setTimeout(5000);
   int httpCode = http.GET();
   bool paired = false;
   if (httpCode == 200) {
@@ -303,12 +315,16 @@ bool checkCloudPairing() {
     if (doc["paired"].as<bool>()) {
       paired = true;
       if (doc.containsKey("patient_id")) pairedPatientId = doc["patient_id"].as<int>();
-      paired = true;
       const char* pName = doc["patient_name"];
       if (pName && strlen(pName) > 0) {
         strlcpy(pairedPatientName, pName, sizeof(pairedPatientName));
       }
+      Serial.printf("[Cloud] Auto-check: TERHUBUNG! Lansia: %s (ID: %d)\n", pairedPatientName, pairedPatientId);
+    } else {
+      Serial.printf("[Cloud] Auto-check: Token %s menunggu pairing di Web...\n", activeToken);
     }
+  } else {
+    Serial.printf("[Cloud] Auto-check: Gagal hubungi %s (%s, HTTP %d)\n", url.c_str(), http.errorToString(httpCode).c_str(), httpCode);
   }
   http.end();
   return paired;
@@ -775,9 +791,22 @@ void setup() {
   evtQ = xQueueCreate(12, sizeof(NetMsg));
   telQ = xQueueCreate(2, sizeof(NetMsg));
 
+  Serial.print("[WiFi] Menghubungkan ke ");
+  Serial.print(WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS, 6);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  int wifiWait = 0;
+  while (WiFi.status() != WL_CONNECTED && wifiWait < 30) {
+    delay(200);
+    Serial.print(".");
+    wifiWait++;
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf(" Terhubung! IP: %s\n", WiFi.localIP().toString().c_str());
+  } else {
+    Serial.println("\n[WiFi] Menyambung di latar belakang...");
+  }
   configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
 
   xTaskCreatePinnedToCore(netTask, "net", 12288, NULL, 1, NULL, 0);
