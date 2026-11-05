@@ -144,6 +144,7 @@ float roomTemp = NAN, roomHum = NAN;
 bool  dhtOk = false;
 float smokeEma = 0;
 bool  simSmoke = false;
+int   smokeOverride = -1; // -1: baca sensor fisik 35, >= 0: software override
 
 uint16_t cancelledCount = 0;   // jumlah alarm dibatalkan lansia
 
@@ -409,8 +410,29 @@ int postJson(const char* url, const char* body) {
   http.addHeader("x-device-token", activeToken);
   http.addHeader("X-Pinggy-No-Screen", "1");
   int code = http.POST(String(body));
-  if (code > 0) Serial.printf("[Cloud] %s -> HTTP %d\n", url, code);
-  else          Serial.printf("[Cloud] %s gagal: %s\n", url, http.errorToString(code).c_str());
+  if (code > 0) {
+    Serial.printf("[Cloud] %s -> HTTP %d\n", url, code);
+    if ((code == 200 || code == 201) && http.getSize() != 0) {
+      String resp = http.getString();
+      StaticJsonDocument<256> doc;
+      if (deserializeJson(doc, resp) == DeserializationError::Ok) {
+        if (doc.containsKey("has_active_emergency")) {
+          bool hasEmerg = doc["has_active_emergency"].as<bool>();
+          if (!hasEmerg && phase != P_IDLE) {
+            simSmoke = false;
+            smokeOverride = 310;
+            smokeEma = 310.0f;
+            hrOverride = 72;
+            clearAlert("RESOLVED");
+            noTone(BUZZER_PIN);
+            Serial.println("[Cloud Sync] Web menormalkan status -> Alarm Wokwi mati & kembali NORMAL!");
+          }
+        }
+      }
+    }
+  } else {
+    Serial.printf("[Cloud] %s gagal: %s\n", url, http.errorToString(code).c_str());
+  }
   http.end();
   digitalWrite(LED_SYNC, (code >= 200 && code < 300) ? HIGH : LOW);
   return code;
@@ -489,7 +511,8 @@ void raiseAlert(AlertKind k, float v, const char* sev, bool sim) {
 void onOkPressed() {
   cancelledCount++;
   simSmoke = false;
-  smokeEma = 320.0f;
+  smokeOverride = 310;
+  smokeEma = 310.0f;
   hrOverride = 72;
   noTone(BUZZER_PIN);
   clearAlert(phase == P_VERIFY ? "CANCELLED" : "RESOLVED");
@@ -626,10 +649,11 @@ void activateBypass() {
 void runCmd(char* s) {
   if      (!strcmp(s, "fall"))  { raiseAlert(K_FALL, 3.0f, "CRITICAL", true); }
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
-  else if (!strcmp(s, "smoke")) { simSmoke = true; }
+  else if (!strcmp(s, "smoke")) { simSmoke = true; smokeOverride = 3500; }
   else if (!strcmp(s, "clear") || !strcmp(s, "normal") || !strcmp(s, "reset") || !strcmp(s, "aman")) {
     simSmoke = false;
-    smokeEma = 320.0f;
+    smokeOverride = 310;
+    smokeEma = 310.0f;
     hrOverride = 72;
     noTone(BUZZER_PIN);
     clearAlert("RESOLVED");
@@ -888,7 +912,7 @@ void loop() {
   // --- MQ-2 5 Hz ---
   if (now - lastSmoke >= 200) {
     lastSmoke = now;
-    float target = simSmoke ? 3500.0f : (float)analogRead(SMOKE_PIN);
+    float target = simSmoke ? 3500.0f : (smokeOverride >= 0 ? (float)smokeOverride : (float)analogRead(SMOKE_PIN));
     smokeEma += 0.3f * (target - smokeEma);
     evalHome();
   }
