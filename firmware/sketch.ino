@@ -58,10 +58,10 @@ const char* WIFI_PASS = "";
 #endif
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
-char activeToken[32]      = "HUAWEI-ECA-8821";   // Token ID Perangkat (Di-generate dinamis saat boot)
+char activeToken[32]      = "HUAWEI-ECA-74E7";   // Token ID default stabil (Sesuai sesi aktif Web Dashboard)
 bool isPaired             = false;                // False: Standby di layar QR | True: Aktif monitoring
-char pairedPatientName[64]= "Opa Budi Santoso";
-int  pairedPatientId      = 1;  // Nama lansia hasil pairing dari web
+char pairedPatientName[64]= "Lansia Terhubung";
+int  pairedPatientId      = 16;  // ID Pasien aktif (Sinkron dinamis dengan Web)
 
 // ==========================================
 // Identitas
@@ -603,16 +603,28 @@ void evalHome() {
 // ==========================================
 // Simulator via Serial
 // ==========================================
+void activateBypass() {
+  Serial.println("[PAIRING] Mencoba sinkronkan data lansia dari Web...");
+  if (!checkCloudPairing()) {
+    if (strlen(activeToken) > 11) {
+      snprintf(pairedPatientName, sizeof(pairedPatientName), "Lansia (%s)", activeToken + 11);
+    } else {
+      snprintf(pairedPatientName, sizeof(pairedPatientName), "Lansia Aktif");
+    }
+  }
+  isPaired = true;
+  Serial.printf("[PAIRING] Operasional Aktif! Lansia: %s (ID: %d, Token: %s)\n", pairedPatientName, pairedPatientId, activeToken);
+  drawWelcomeScreen();
+  delay(1500);
+}
+
 void runCmd(char* s) {
   if      (!strcmp(s, "fall"))  { raiseAlert(K_FALL, 3.0f, "CRITICAL", true); }
   else if (!strcmp(s, "sos"))   { raiseAlert(K_SOS, 0, "CRITICAL", true); }
   else if (!strcmp(s, "smoke")) { simSmoke = true; }
   else if (!strcmp(s, "clear")) { simSmoke = false; }
   else if (!strcmp(s, "ok") || !strcmp(s, "bypass")) {
-    isPaired = true;
-    Serial.println("[PAIRING] Manual bypass via serial command!");
-    drawWelcomeScreen();
-    delay(1500);
+    activateBypass();
   }
   else if (!strcmp(s, "qr") || !strcmp(s, "pair")) {
     drawQrCodeScreen();
@@ -739,8 +751,7 @@ void setup() {
   Serial.println("\n=== AI-Powered Elderly Care - Device Layer ===");
   bootId = esp_random();
 
-  // Otomatis generate Token ID Unik Baru (acak) setiap kali ESP32 dinyalakan / di-reset!
-  snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", (unsigned)(esp_random() & 0xFFFF));
+  // Token ID default stabil: HUAWEI-ECA-74E7 (Ketik 'token new' di Serial jika ingin acak baru)
 
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_SYNC, OUTPUT);
@@ -809,10 +820,7 @@ void loop() {
   // Tombol OK: Jika belum paired, menekan OK mem-bypass manual ke status operasional aktif
   if (btnEdge(btnOk)) {
     if (!isPaired) {
-      isPaired = true;
-      Serial.println("[PAIRING] Manual bypass via tombol OK ditekan!");
-      drawWelcomeScreen();
-      delay(1500);
+      activateBypass();
       return;
     } else {
       onOkPressed();
