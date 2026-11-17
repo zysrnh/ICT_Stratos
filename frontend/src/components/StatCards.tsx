@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Footprints, Flame, ShieldCheck, AlertTriangle, Radio } from 'lucide-react';
+import { Heart, Footprints, Thermometer, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import type { HealthMetric, EmergencyEvent } from '../types/telemetry';
 
 interface StatCardsProps {
@@ -8,184 +8,189 @@ interface StatCardsProps {
   activeEvents?: EmergencyEvent[];
 }
 
-export const StatCards: React.FC<StatCardsProps> = ({ latestMetric, homeMetric, activeEvents = [] }) => {
-  const hasWatchData = Boolean(latestMetric && latestMetric.heart_rate !== null && latestMetric.heart_rate !== undefined);
+export const StatCards: React.FC<StatCardsProps> = ({
+  latestMetric,
+  homeMetric,
+  activeEvents = [],
+}) => {
+  const hasWatchData = Boolean(
+    latestMetric && latestMetric.heart_rate !== null && latestMetric.heart_rate !== undefined
+  );
   const hr = hasWatchData ? latestMetric!.heart_rate : null;
   const steps = hasWatchData ? (latestMetric!.steps ?? 0) : null;
   const activity = hasWatchData ? (latestMetric!.activity ?? 'REST') : 'OFFLINE';
-  const metricStatus = hasWatchData ? (latestMetric!.health_status ?? 'NORMAL') : 'STANDBY';
-  const cancelledAlerts = hasWatchData ? (latestMetric!.fall_cancelled ?? 0) : 0;
 
-  // Cek apakah ada kejadian darurat aktif (PENDING atau ESCALATED)
-  const activeEmerg = activeEvents.find((e) => e.status === 'PENDING' || e.status === 'ESCALATED');
+  const activeEmerg = activeEvents.find(
+    (e) => e.status === 'PENDING' || e.status === 'ESCALATED'
+  );
 
-  // Node keselamatan rumah
+  // Data lingkungan rumah
   const hasHomeData = Boolean(
     (homeMetric && homeMetric.room_temp !== null && homeMetric.room_temp !== undefined) ||
-    (latestMetric && latestMetric.room_temp !== null && latestMetric.room_temp !== undefined)
+      (latestMetric && latestMetric.room_temp !== null && latestMetric.room_temp !== undefined)
   );
   const roomTemp = homeMetric?.room_temp ?? latestMetric?.room_temp ?? null;
-  const smokeAdc = homeMetric?.smoke_adc ?? latestMetric?.smoke_adc ?? null;
   const rawSmokeStatus = homeMetric?.smoke_status ?? latestMetric?.smoke_status ?? 'NORMAL';
   const smokeStatus = activeEmerg?.event_type === 'SMOKE' ? 'ALERT' : rawSmokeStatus;
 
-  const isCritical = Boolean(activeEmerg) || metricStatus === 'CRITICAL' || smokeStatus === 'ALERT';
-  const isWarning = !isCritical && metricStatus === 'WARNING';
+  // Status Detak Jantung
+  const hrHigh = hasWatchData && hr! > 100;
+  const hrLow = hasWatchData && hr! < 50;
 
-  // Label status EWS yang dinamis & jelas saat simulasi aktif
-  const displayStatus = activeEmerg
-    ? activeEmerg.event_type === 'FALL'
-      ? 'JATUH (DARURAT)'
-      : activeEmerg.event_type === 'SOS'
-      ? 'SOS (PANIK)'
-      : activeEmerg.event_type === 'SMOKE'
-      ? 'ASAP (BAHAYA)'
-      : 'DARURAT'
-    : metricStatus;
+  // Status Aktivitas
+  const isFallActivity = activeEmerg?.event_type === 'FALL' || activity === 'FALL';
+  const isMoving = activity === 'ACTIVE' || activity === 'WALKING';
+
+  // Status Udara
+  const isSmokeAlert = smokeStatus === 'ALERT';
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-6">
-      {/* 1. Heart Rate (Health Monitoring) */}
-      <div className="bg-white rounded-none p-3.5 sm:p-5 border border-neutral-200 hover:border-neutral-400 shadow-xs flex flex-col justify-between transition-colors">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 uppercase tracking-wider">
-            Detak Jantung
-          </span>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-none bg-neutral-100 text-rose-600 flex items-center justify-center border border-neutral-200">
-            <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${hasWatchData ? 'fill-rose-500 stroke-rose-600' : 'text-neutral-400'}`} />
+    <section
+      aria-label="Ringkasan kondisi vital"
+      className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6 mb-8"
+    >
+      {/* 1. Detak jantung */}
+      <div className="hc-card p-6 flex flex-col justify-between gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-medium text-[#52525B]">Detak jantung</h2>
+          <div className="w-11 h-11 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center shrink-0">
+            <Heart className="w-5 h-5" aria-hidden="true" />
           </div>
         </div>
-        <div className="flex items-baseline gap-1.5 sm:gap-2">
+
+        <div className="flex items-baseline gap-2 transition-opacity duration-200">
           {hasWatchData ? (
             <>
-              <span className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#111111] tracking-tight">{hr}</span>
-              <span className="text-[10px] sm:text-xs font-bold text-neutral-500 uppercase">BPM</span>
+              <span className="text-3xl sm:text-4xl font-semibold text-[#18181B] tabular-nums">
+                {hr}
+              </span>
+              <span className="text-[15px] font-medium text-[#52525B]">BPM</span>
             </>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xl sm:text-3xl font-extrabold text-neutral-300">--</span>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">Menunggu</span>
-            </div>
+            <span className="text-3xl sm:text-4xl font-semibold text-[#71717A]">--</span>
           )}
         </div>
-        <div className="mt-2.5 sm:mt-3 pt-2.5 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 text-[11px] sm:text-xs text-neutral-500">
-          <span className="truncate">Target: 60-100</span>
-          {hasWatchData ? (
-            <span className={`font-bold shrink-0 ${hr! > 100 ? 'text-rose-600' : hr! < 50 ? 'text-amber-600' : 'text-emerald-700'}`}>
-              {hr! > 100 ? 'Takikardia' : hr! < 50 ? 'Bradikardia' : 'Normal'}
+
+        <div>
+          {!hasWatchData ? (
+            <span className="hc-chip bg-[#F3F2EE] text-[#52525B] border border-[#E5E3DD]">
+              <Clock className="w-3.5 h-3.5 text-[#71717A]" aria-hidden="true" />
+              <span>Menunggu</span>
+            </span>
+          ) : hrHigh ? (
+            <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+              <span>Detak cepat</span>
+            </span>
+          ) : hrLow ? (
+            <span className="hc-chip bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+              <span>Detak lambat</span>
             </span>
           ) : (
-            <span className="text-neutral-400 italic">Standby</span>
+            <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+              <span>Normal</span>
+            </span>
           )}
         </div>
       </div>
 
-      {/* 2. Langkah & Aktivitas Fisik (Pedometer) */}
-      <div className="bg-white rounded-none p-3.5 sm:p-5 border border-neutral-200 hover:border-neutral-400 shadow-xs flex flex-col justify-between transition-colors">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 uppercase tracking-wider">
-            Aktivitas Gerak
-          </span>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-none bg-neutral-100 text-blue-600 flex items-center justify-center border border-neutral-200">
-            <Footprints className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+      {/* 2. Aktivitas */}
+      <div className="hc-card p-6 flex flex-col justify-between gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-medium text-[#52525B]">Aktivitas</h2>
+          <div className="w-11 h-11 rounded-full bg-[#F0FDF4] text-[#15803D] flex items-center justify-center shrink-0">
+            <Footprints className="w-5 h-5" aria-hidden="true" />
           </div>
         </div>
-        <div className="flex items-baseline gap-1.5 sm:gap-2">
+
+        <div className="flex items-baseline gap-2 transition-opacity duration-200">
           {hasWatchData ? (
             <>
-              <span className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#111111] tracking-tight">
+              <span className="text-3xl sm:text-4xl font-semibold text-[#18181B] tabular-nums">
                 {steps!.toLocaleString('id-ID')}
               </span>
-              <span className="text-[10px] sm:text-xs font-bold text-neutral-500 uppercase">Langkah</span>
+              <span className="text-[15px] font-medium text-[#52525B]">langkah</span>
             </>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xl sm:text-3xl font-extrabold text-neutral-300">--</span>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">0 Langkah</span>
-            </div>
+            <span className="text-3xl sm:text-4xl font-semibold text-[#71717A]">--</span>
           )}
         </div>
-        <div className="mt-2.5 sm:mt-3 pt-2.5 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 text-[11px] sm:text-xs text-neutral-500">
-          <span className="truncate">Status Gerak</span>
-          {hasWatchData ? (
-            <span className="font-bold text-neutral-800 shrink-0">
-              {activity === 'ACTIVE' || activity === 'WALKING' ? 'Bergerak' : 'Istirahat'}
+
+        <div>
+          {!hasWatchData ? (
+            <span className="hc-chip bg-[#F3F2EE] text-[#52525B] border border-[#E5E3DD]">
+              <Clock className="w-3.5 h-3.5 text-[#71717A]" aria-hidden="true" />
+              <span>Menunggu</span>
+            </span>
+          ) : isFallActivity ? (
+            <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+              <span>Jatuh</span>
+            </span>
+          ) : isMoving ? (
+            <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+              <span>Bergerak</span>
             </span>
           ) : (
-            <span className="text-neutral-400 italic">Standby</span>
+            <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+              <span>Normal</span>
+            </span>
           )}
         </div>
       </div>
 
-      {/* 3. Node Keamanan Rumah (Home Safety - MQ2 & DHT22) */}
-      <div className="bg-white rounded-none p-3.5 sm:p-5 border border-neutral-200 hover:border-neutral-400 shadow-xs flex flex-col justify-between transition-colors">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 uppercase tracking-wider">
-            Suhu & Udara
-          </span>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-none bg-neutral-100 text-amber-600 flex items-center justify-center border border-neutral-200">
-            <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+      {/* 3. Suhu & udara */}
+      <div className="hc-card p-6 flex flex-col justify-between gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-medium text-[#52525B]">Suhu &amp; udara</h2>
+          <div
+            className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${
+              isSmokeAlert
+                ? 'bg-[#FEF2F2] text-[#DC2626]'
+                : 'bg-[#FFFBEB] text-[#D97706]'
+            }`}
+          >
+            <Thermometer className="w-5 h-5" aria-hidden="true" />
           </div>
         </div>
-        <div className="flex items-baseline gap-1.5 sm:gap-2 flex-wrap">
+
+        <div className="flex items-baseline gap-2 transition-opacity duration-200">
           {hasHomeData && roomTemp !== null ? (
             <>
-              <span className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#111111] tracking-tight">{roomTemp}°C</span>
-              {smokeAdc !== null && (
-                <span className="text-[10px] sm:text-xs font-bold text-neutral-500">
-                  Gas: {smokeAdc}
-                </span>
-              )}
+              <span className="text-3xl sm:text-4xl font-semibold text-[#18181B] tabular-nums">
+                {Number(roomTemp).toFixed(1)}
+              </span>
+              <span className="text-[15px] font-medium text-[#52525B]">°C</span>
             </>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xl sm:text-3xl font-extrabold text-neutral-300">--</span>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">Siaga</span>
-            </div>
+            <span className="text-3xl sm:text-4xl font-semibold text-[#71717A]">--</span>
           )}
         </div>
-        <div className="mt-2.5 sm:mt-3 pt-2.5 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 text-[11px] sm:text-xs text-neutral-500">
-          <span className="truncate">Sensor MQ-2</span>
-          {hasHomeData ? (
-            <span className={`font-bold shrink-0 ${smokeStatus === 'ALERT' ? 'text-rose-600 animate-pulse' : 'text-emerald-700'}`}>
-              {smokeStatus === 'ALERT' ? 'BAHAYA!' : 'Udara Bersih'}
+
+        <div>
+          {!hasHomeData ? (
+            <span className="hc-chip bg-[#F3F2EE] text-[#52525B] border border-[#E5E3DD]">
+              <Clock className="w-3.5 h-3.5 text-[#71717A]" aria-hidden="true" />
+              <span>Menunggu</span>
+            </span>
+          ) : isSmokeAlert ? (
+            <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+              <AlertTriangle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+              <span>Bahaya asap</span>
             </span>
           ) : (
-            <span className="text-neutral-400 italic">Siaga</span>
+            <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+              <span>Normal</span>
+            </span>
           )}
         </div>
       </div>
-
-      {/* 4. Status Sistem & EWS */}
-      <div className="bg-white rounded-none p-3.5 sm:p-5 border border-neutral-200 hover:border-neutral-400 shadow-xs flex flex-col justify-between transition-colors">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 uppercase tracking-wider">
-            Status EWS
-          </span>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-none bg-neutral-100 text-emerald-600 flex items-center justify-center border border-neutral-200">
-            {!hasWatchData ? <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" /> :
-             isCritical || isWarning ? <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600" /> :
-             <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />}
-          </div>
-        </div>
-        <div className="flex items-baseline gap-1.5 sm:gap-2">
-          <span className={`text-lg sm:text-2xl lg:text-2xl font-extrabold tracking-tight ${
-            !hasWatchData ? 'text-neutral-400' :
-            isCritical ? 'text-rose-600 animate-pulse' :
-            isWarning ? 'text-amber-600' :
-            'text-emerald-700'
-          }`}>
-            {displayStatus}
-          </span>
-        </div>
-        <div className="mt-2.5 sm:mt-3 pt-2.5 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 text-[11px] sm:text-xs text-neutral-500">
-          <span className="truncate">Sistem EWS</span>
-          <span className={`font-semibold shrink-0 ${activeEmerg ? 'text-rose-600 font-black' : 'text-neutral-700'}`}>
-            {activeEmerg ? 'Eskalasi Darurat' : hasWatchData ? (cancelledAlerts > 0 ? `${cancelledAlerts}x Batal` : 'Siaga Aktif') : 'Menunggu'}
-          </span>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };
 

@@ -5,6 +5,8 @@ import {
   ShieldCheck,
   Lock,
   User,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import type { EmergencyContact, ConsentItem, PatientInfo, AuthSession } from '../types/telemetry';
 import {
@@ -49,155 +51,167 @@ export const FamilyPrivacyView: React.FC<FamilyPrivacyViewProps> = ({ session })
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Kolom Kiri: Profil Lansia & Kontak Darurat Bertingkat */}
-      <div className="lg:col-span-6 space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full min-w-0">
+      {/* Kolom Kiri: Profil Lansia & Kontak Darurat */}
+      <div className="lg:col-span-6 space-y-6 min-w-0">
         {/* Kartu Profil Lansia */}
-        <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
-          <div className="flex items-center gap-3.5 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-neutral-900 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              <User className="w-6 h-6" />
+        <section aria-label="Profil lansia" className="hc-card p-6">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="w-12 h-12 rounded-full bg-[#F3F2EE] text-[#18181B] flex items-center justify-center shrink-0">
+              <User className="w-6 h-6" aria-hidden="true" />
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                {patient?.patient_code || 'ELD-001'} • Rekam Medis
-              </span>
-              <h3 className="text-lg font-extrabold text-[#111111]">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-[#18181B] truncate">
                 {patient?.full_name || session?.patient_name || 'Opa Budi Santoso'}
-              </h3>
-              <p className="text-xs text-neutral-500">
-                Usia {patient?.age || 71} Tahun • {patient?.gender === 'FEMALE' ? 'Perempuan' : 'Laki-laki'}
+              </h2>
+              <p className="text-[14px] text-[#52525B] mt-0.5">
+                Usia {patient?.age || 71} tahun ·{' '}
+                {patient?.gender === 'FEMALE' ? 'Perempuan' : 'Laki-laki'}
               </p>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/70 text-xs text-neutral-600">
-            <span className="font-bold text-neutral-900 block mb-1">Kondisi Umum:</span>
+          <div className="p-4 rounded-[16px] bg-[#FAF9F7] border border-[#E5E3DD] text-[14px] text-[#52525B] leading-relaxed">
+            <span className="font-semibold text-[#18181B] block mb-1">Catatan kesehatan</span>
             {patient?.condition_summary ||
               'Hipertensi terkontrol dengan Amlodipine 5mg. Riwayat pusing ringan saat perubahan posisi tidur ke berdiri.'}
           </div>
-        </div>
+        </section>
 
-        {/* Daftar Kontak Darurat Eskalasi (Pilar 4: Family Connection) */}
-        <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                <Users2 className="w-4 h-4 stroke-[2.2]" />
+        {/* Daftar Kontak Darurat */}
+        <section aria-label="Kontak darurat keluarga" className="hc-card p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center shrink-0">
+                <Users2 className="w-5 h-5" aria-hidden="true" />
               </div>
-              <h3 className="text-base font-bold text-[#111111]">Eskalasi Kontak Darurat</h3>
+              <h2 className="text-lg font-semibold text-[#18181B]">Kontak darurat</h2>
             </div>
-            <span className="text-xs bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-none">
-              Hierarki Prioritas
+            <span className="hc-chip bg-[#FAF9F7] text-[#52525B] border border-[#E5E3DD]">
+              Urutan prioritas
             </span>
           </div>
 
-          <p className="text-xs text-neutral-500 mb-4">
-            Jika lansia tidak merespons alarm jatuh/anomali, sistem otomatis meneruskan notifikasi sesuai hierarki prioritas:
+          <p className="text-[14px] text-[#52525B] mb-5 leading-relaxed">
+            Jika lansia tidak merespons jam tangan saat darurat, pemberitahuan diteruskan sesuai urutan berikut:
           </p>
 
           <div className="space-y-3">
             {contacts.map((c) => (
               <div
                 key={c.id}
-                className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-between"
+                className="p-4 rounded-[16px] bg-[#FAF9F7] border border-[#E5E3DD] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-neutral-200 text-neutral-800">
-                      Tingkat {c.priority_order}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="hc-chip bg-white text-[#52525B] border border-[#E5E3DD]">
+                      Prioritas {c.priority_order}
                     </span>
                     {c.is_primary && (
-                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
-                        Keluarga Utama
+                      <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+                        Kontak utama
                       </span>
                     )}
                   </div>
-                  <h4 className="text-sm font-bold text-neutral-900 mt-1">{c.name}</h4>
-                  <p className="text-xs text-neutral-500">{c.relationship}</p>
+                  <h3 className="text-[15px] font-semibold text-[#18181B] truncate">{c.name}</h3>
+                  <p className="text-[13px] text-[#52525B]">{c.relationship}</p>
                 </div>
 
                 <a
                   href={`tel:${c.phone_number}`}
-                  className="px-3.5 py-2 rounded-xl bg-white border border-neutral-300 text-neutral-800 hover:bg-neutral-900 hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  aria-label={`Hubungi ${c.name} di ${c.phone_number}`}
+                  className="hc-btn-secondary px-4 py-2.5 text-[14px] inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer"
                 >
-                  <Phone className="w-3.5 h-3.5" />
+                  <Phone className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
                   <span>{c.phone_number}</span>
                 </a>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* Kolom Kanan: Kepatuhan Privasi & Consent UU PDP No. 27/2022 */}
-      <div className="lg:col-span-6 space-y-6">
-        <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <ShieldCheck className="w-4 h-4 stroke-[2.2]" />
+      {/* Kolom Kanan: Persetujuan Data (UU PDP) */}
+      <div className="lg:col-span-6 space-y-6 min-w-0">
+        <section aria-label="Persetujuan data pribadi" className="hc-card p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#F0FDF4] text-[#15803D] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" aria-hidden="true" />
               </div>
-              <h3 className="text-base font-bold text-[#111111]">Persetujuan Data (UU PDP)</h3>
+              <h2 className="text-lg font-semibold text-[#18181B]">Persetujuan data</h2>
             </div>
-            <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+            <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
               UU No. 27/2022
             </span>
           </div>
 
-          <p className="text-xs text-neutral-500 mb-4 leading-relaxed">
-            Sesuai UU Pelindungan Data Pribadi (UU PDP), data biometrik kesehatan adalah data spesifik yang
-            wajib memiliki persetujuan eksplisit dari lansia/wali dan dapat dicabut sewaktu-waktu.
+          <p className="text-[14px] text-[#52525B] mb-5 leading-relaxed">
+            Pengambilan data kesehatan memerlukan persetujuan lansia atau wali keluarga dan dapat diubah kapan saja.
           </p>
 
           <div className="space-y-3">
             {consents.map((cn) => (
               <div
                 key={cn.id}
-                className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-start justify-between gap-3"
+                className="p-4 rounded-[16px] bg-[#FAF9F7] border border-[#E5E3DD] flex items-start justify-between gap-4"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-neutral-900">{cn.data_type}</h4>
-                    <span
-                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
-                        cn.is_granted ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {cn.is_granted ? 'DIBERIKAN' : 'DICABUT'}
-                    </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[15px] font-semibold text-[#18181B]">{cn.data_type}</h3>
+                    {cn.is_granted ? (
+                      <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                        <span>Diizinkan</span>
+                      </span>
+                    ) : (
+                      <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+                        <AlertCircle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                        <span>Nonaktif</span>
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[11px] text-neutral-500 mt-1 leading-normal">
+                  <p className="text-[13px] text-[#52525B] mt-1.5 leading-relaxed">
                     {cn.description}
                   </p>
                 </div>
 
+                {/* Toggle Pill Konsisten (Tap target >= 44px) */}
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={cn.is_granted}
+                  aria-label={`${cn.data_type}: ${cn.is_granted ? 'Aktif' : 'Nonaktif'}`}
                   onClick={() => handleToggleConsent(cn.id, cn.is_granted)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    cn.is_granted
-                      ? 'bg-neutral-900 text-white hover:bg-rose-600'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}
+                  className="min-w-[48px] min-h-[44px] flex items-center justify-end shrink-0 cursor-pointer"
                 >
-                  {cn.is_granted ? 'Cabut' : 'Izinkan'}
+                  <span
+                    className={`inline-flex items-center w-12 h-7 p-0.5 rounded-full transition-colors duration-180 ${
+                      cn.is_granted ? 'bg-[#15803D]' : 'bg-[#D4D1C9]'
+                    }`}
+                  >
+                    <span
+                      className={`w-6 h-6 rounded-full bg-white shadow-xs transition-transform duration-180 ease-out ${
+                        cn.is_granted ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
                 </button>
               </div>
             ))}
           </div>
 
-          <div className="mt-5 p-3.5 rounded-none bg-neutral-900 text-white text-[11px] space-y-1">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Standar Pengamanan Data Transit & At-Rest</span>
+          <div className="mt-6 p-4 rounded-[16px] bg-[#F0FDF4] border border-[#BBF7D0] flex items-start gap-3">
+            <Lock className="w-5 h-5 text-[#15803D] shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="text-[13px] text-[#166534] leading-relaxed">
+              <span className="font-semibold block">Data terjaga &amp; terenkripsi</span>
+              Komunikasi antar perangkat dan penyimpanan riwayat keluarga terlindungi oleh enkripsi standar.
             </div>
-            <p className="text-neutral-400">
-              Enkripsi data transit (TLS/HTTPS), enkripsi database RDS Huawei Cloud, pembatasan akses berbasis peran (RBAC),
-              dan audit log jejak waktu akses tersimpan aman.
-            </p>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
 };
+
+export default FamilyPrivacyView;

@@ -1,5 +1,18 @@
-import React from 'react';
-import { Bell, Search, Watch, RefreshCw, LogOut } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Bell,
+  Watch,
+  SlidersHorizontal,
+  X,
+  Activity,
+  ShieldAlert,
+  Flame,
+  RotateCcw,
+  KeyRound,
+  Settings,
+  LogOut,
+  Check,
+} from 'lucide-react';
 import type { AuthSession } from '../types/telemetry';
 
 interface HeaderProps {
@@ -7,6 +20,11 @@ interface HeaderProps {
   session: AuthSession | null;
   onOpenAuth: () => void;
   onLogout?: () => void;
+  onTriggerSim?: (type: 'FALL' | 'SOS' | 'SMOKE') => Promise<void> | void;
+  onResetNormal?: () => Promise<void> | void;
+  onGoToSettings?: () => void;
+  onGoToSafety?: () => void;
+  lastUpdatedText?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,82 +32,271 @@ export const Header: React.FC<HeaderProps> = ({
   session,
   onOpenAuth,
   onLogout,
+  onTriggerSim,
+  onResetNormal,
+  onGoToSettings,
+  onGoToSafety,
+  lastUpdatedText = 'Diperbarui 1 detik lalu',
 }) => {
+  const [isSimOpen, setIsSimOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [simFeedback, setSimFeedback] = useState<string | null>(null);
+  const simRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Tutup popover saat klik di luar atau tekan Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (simRef.current && !simRef.current.contains(e.target as Node)) {
+        setIsSimOpen(false);
+      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSimOpen(false);
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, []);
+
+  const handleSimAction = async (label: string, action?: () => Promise<void> | void) => {
+    if (!action) return;
+    await action();
+    setSimFeedback(label);
+    setTimeout(() => setSimFeedback(null), 1800);
+  };
+
+  // Inisial ramah untuk avatar bulat
+  const rawName = session?.user?.full_name || session?.patient_name || 'Keluarga';
+  const initials = rawName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || '')
+    .join('') || 'K';
+
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 select-none">
-      {/* Title & Patient Information */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-[#111111]">
-            Patient Monitoring
-          </h1>
-          {session && (
-            <span className="px-2 py-0.5 text-[11px] font-bold bg-[#111111] text-white rounded-none">
-              {session.patient_name}
-            </span>
-          )}
-        </div>
-        <p className="text-[11px] sm:text-xs text-neutral-500 font-medium mt-0.5">
-          Real-time Biometrics &amp; Early Warning System — Huawei Ecosystem
-        </p>
+    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      {/* Judul Ramah & Waktu Pembaruan */}
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-semibold text-[#18181B] leading-snug truncate">
+          Kondisi {session?.patient_name || 'Lansia'}
+        </h1>
+        <p className="text-[13px] text-[#52525B] mt-0.5">{lastUpdatedText}</p>
       </div>
 
-      {/* Right Controls: Token Pairing, Alert Bell & Controls */}
-      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-        {/* Token Pairing Status Button */}
+      {/* Kontrol Kanan */}
+      <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        {/* Pill Status Jam Tangan */}
         <button
+          type="button"
           onClick={onOpenAuth}
-          title="Klik untuk mengganti token perangkat / ID Jam"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-neutral-300 hover:border-neutral-900 transition-colors text-xs font-mono shadow-xs cursor-pointer rounded-none"
+          aria-label="Status jam tangan terhubung, klik untuk mengganti perangkat"
+          className="hc-chip min-h-[44px] bg-white border border-[#E5E3DD] hover:bg-[#F3F2EE] text-[#18181B] cursor-pointer px-3.5"
         >
-          <span className="w-2 h-2 rounded-none bg-emerald-500 shrink-0" />
-          <Watch className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
-          <span className="font-bold text-neutral-900 truncate max-w-[150px]">
-            {session ? session.token : 'Belum Dipasangkan'}
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              session ? 'bg-[#15803D]' : 'bg-[#71717A]'
+            }`}
+          />
+          <Watch className="w-4 h-4 text-[#52525B] shrink-0" aria-hidden="true" />
+          <span className="text-[13px] font-medium whitespace-nowrap">
+            {session ? 'Jam terhubung' : 'Belum terhubung'}
           </span>
-          <RefreshCw className="w-3 h-3 text-neutral-400 shrink-0" />
         </button>
 
-        {/* Search Box (Desktop only) */}
-        <div className="relative hidden lg:block">
-          <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Cari metrik..."
-            className="pl-8 pr-3 py-1.5 text-xs bg-white border border-neutral-200 rounded-none w-36 focus:outline-none focus:border-neutral-900 shadow-xs"
-          />
-        </div>
+        {/* Tombol & Popover Mode Simulasi */}
+        {(onTriggerSim || onResetNormal) && (
+          <div className="relative" ref={simRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSimOpen((prev) => !prev);
+                setIsMenuOpen(false);
+              }}
+              aria-expanded={isSimOpen}
+              aria-haspopup="dialog"
+              className={`hc-btn-secondary px-3.5 py-2 text-[13px] flex items-center gap-2 cursor-pointer ${
+                isSimOpen ? 'bg-[#F3F2EE] border-[#D4D1C9]' : ''
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#52525B]" aria-hidden="true" />
+              <span className="whitespace-nowrap">Mode simulasi</span>
+            </button>
 
-        {/* Notification Icon */}
+            {isSimOpen && (
+              <div
+                role="dialog"
+                aria-label="Mode simulasi"
+                className="fixed inset-x-4 top-20 sm:inset-auto sm:absolute sm:right-0 sm:top-[calc(100%+10px)] sm:w-80 bg-white border border-[#E5E3DD] rounded-[20px] p-5 z-50 hc-fade-soft"
+                style={{ boxShadow: 'var(--shadow-popover)' }}
+              >
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h2 className="text-base font-semibold text-[#18181B]">Mode simulasi</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsSimOpen(false)}
+                    aria-label="Tutup mode simulasi"
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-[#52525B] hover:bg-[#F3F2EE] cursor-pointer transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-[13px] text-[#52525B] mb-4 leading-relaxed">
+                  Uji respons darurat langsung dari dasbor ke jam tangan.
+                </p>
+
+                <div className="grid grid-cols-1 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSimAction('Uji jatuh aktif', () => onTriggerSim?.('FALL'))}
+                    className="min-h-[44px] w-full px-3.5 py-2.5 rounded-[12px] bg-[#FFFBEB] hover:bg-amber-100/70 border border-[#FDE68A] text-[#92400E] text-[14px] font-medium flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                  >
+                    <Activity className="w-4 h-4 shrink-0 text-[#D97706]" aria-hidden="true" />
+                    <span>Uji jatuh</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSimAction('Tombol SOS aktif', () => onTriggerSim?.('SOS'))}
+                    className="min-h-[44px] w-full px-3.5 py-2.5 rounded-[12px] bg-[#FEF2F2] hover:bg-red-100/70 border border-[#FECACA] text-[#991B1B] text-[14px] font-medium flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                  >
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-[#DC2626]" aria-hidden="true" />
+                    <span>Tombol SOS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSimAction('Bahaya asap aktif', () => onTriggerSim?.('SMOKE'))}
+                    className="min-h-[44px] w-full px-3.5 py-2.5 rounded-[12px] bg-[#FFFBEB] hover:bg-amber-100/70 border border-[#FDE68A] text-[#92400E] text-[14px] font-medium flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                  >
+                    <Flame className="w-4 h-4 shrink-0 text-[#D97706]" aria-hidden="true" />
+                    <span>Bahaya asap</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSimAction('Status kembali normal', onResetNormal)}
+                    className="min-h-[44px] w-full px-3.5 py-2.5 rounded-[12px] bg-[#F0FDF4] hover:bg-green-100/70 border border-[#BBF7D0] text-[#166534] text-[14px] font-semibold flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                  >
+                    <RotateCcw className="w-4 h-4 shrink-0 text-[#15803D]" aria-hidden="true" />
+                    <span>Reset</span>
+                  </button>
+                </div>
+
+                {simFeedback && (
+                  <div className="mt-3 px-3 py-2 rounded-[12px] bg-[#F3F2EE] text-[13px] text-[#18181B] flex items-center gap-2 hc-fade-soft">
+                    <Check className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
+                    <span>{simFeedback}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tombol Notifikasi */}
         <button
-          className="relative w-8 h-8 sm:w-9 sm:h-9 bg-white border border-neutral-300 flex items-center justify-center text-neutral-700 hover:bg-neutral-100 transition-colors shadow-xs cursor-pointer rounded-none"
-          title="Notifikasi Kejadian"
+          type="button"
+          onClick={onGoToSafety}
+          aria-label={alertCount > 0 ? `${alertCount} peringatan aktif, buka keamanan rumah` : 'Notifikasi keamanan rumah'}
+          className="relative w-11 h-11 rounded-full bg-white border border-[#E5E3DD] hover:bg-[#F3F2EE] flex items-center justify-center text-[#18181B] transition-colors cursor-pointer shrink-0"
         >
-          <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
           {alertCount > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-600 rounded-none" />
+            <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-[#DC2626] rounded-full ring-2 ring-white hc-pulse-critical" />
           )}
         </button>
 
-        {/* User Role Avatar */}
-        <button
-          onClick={onOpenAuth}
-          title={`Masuk sebagai: ${session?.user?.full_name || 'Keluarga'}`}
-          className="w-8 h-8 sm:w-9 sm:h-9 bg-[#111111] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 cursor-pointer hover:bg-neutral-800 transition-colors rounded-none"
-        >
-          {session?.user?.role === 'FAMILY_PRIMARY' ? 'FAM' : 'ECA'}
-        </button>
-
-        {/* Disconnect Button */}
-        {onLogout && (
+        {/* Avatar Bulat dengan Menu */}
+        <div className="relative" ref={menuRef}>
           <button
-            onClick={onLogout}
-            title="Putuskan Koneksi / Logout"
-            className="w-8 h-8 sm:w-9 sm:h-9 bg-white border border-neutral-300 text-neutral-600 hover:text-red-600 hover:border-red-500 transition-colors flex items-center justify-center shadow-xs cursor-pointer rounded-none"
+            type="button"
+            onClick={() => {
+              setIsMenuOpen((prev) => !prev);
+              setIsSimOpen(false);
+            }}
+            aria-label={`Menu akun ${rawName}`}
+            aria-expanded={isMenuOpen}
+            aria-haspopup="menu"
+            className="w-11 h-11 rounded-full bg-[#18181B] hover:bg-[#27272A] text-white flex items-center justify-center font-medium text-sm shrink-0 cursor-pointer transition-colors"
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            {initials}
           </button>
-        )}
+
+          {isMenuOpen && (
+            <div
+              role="menu"
+              className="fixed inset-x-4 top-20 sm:inset-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-64 bg-white border border-[#E5E3DD] rounded-[20px] p-3 z-50 hc-fade-soft"
+              style={{ boxShadow: 'var(--shadow-popover)' }}
+            >
+              <div className="px-3 py-2.5 border-b border-[#E5E3DD] mb-1.5">
+                <p className="text-[15px] font-semibold text-[#18181B] truncate">{rawName}</p>
+                <p className="text-[13px] text-[#52525B] truncate">
+                  Memantau {session?.patient_name || 'Lansia'}
+                </p>
+                {session?.token && (
+                  <p className="text-[12px] font-mono text-[#71717A] mt-1 truncate">
+                    {session.token}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenAuth();
+                }}
+                className="w-full min-h-[44px] px-3 py-2 rounded-[12px] text-[14px] text-[#18181B] hover:bg-[#F3F2EE] flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+              >
+                <KeyRound className="w-4 h-4 text-[#52525B]" aria-hidden="true" />
+                <span>Ganti jam tangan</span>
+              </button>
+
+              {onGoToSettings && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onGoToSettings();
+                  }}
+                  className="w-full min-h-[44px] px-3 py-2 rounded-[12px] text-[14px] text-[#18181B] hover:bg-[#F3F2EE] flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                >
+                  <Settings className="w-4 h-4 text-[#52525B]" aria-hidden="true" />
+                  <span>Pengaturan</span>
+                </button>
+              )}
+
+              {onLogout && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onLogout();
+                  }}
+                  className="w-full min-h-[44px] px-3 py-2 rounded-[12px] text-[14px] text-[#991B1B] hover:bg-[#FEF2F2] flex items-center gap-2.5 cursor-pointer transition-colors text-left mt-1"
+                >
+                  <LogOut className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                  <span>Putuskan koneksi</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

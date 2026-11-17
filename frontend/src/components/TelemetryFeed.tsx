@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import type { HealthMetric } from '../types/telemetry';
 
 interface TelemetryFeedProps {
@@ -8,23 +8,25 @@ interface TelemetryFeedProps {
 
 export const TelemetryFeed: React.FC<TelemetryFeedProps> = ({ metrics }) => {
   return (
-    <div className="bg-white rounded-3xl p-6 border border-neutral-200/80 shadow-xs flex flex-col">
+    <section aria-label="Riwayat pembacaan sensor terbaru" className="hc-card p-6 flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-lg font-extrabold text-[#111111] tracking-tight">Recent Telemetry Stream</h2>
-          <p className="text-xs text-neutral-400 font-medium">Auto-synced from Huawei Watch ESP32</p>
+          <h2 className="text-lg font-semibold text-[#18181B]">Pembacaan terbaru</h2>
+          <p className="text-[13px] text-[#52525B] mt-0.5">
+            Tersinkron otomatis dari jam tangan dan sensor rumah
+          </p>
         </div>
-        <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-3 py-1 rounded-full">
-          Total: {metrics.length} records
+        <span className="hc-chip bg-[#F3F2EE] text-[#52525B] border border-[#E5E3DD]">
+          {metrics.length} data
         </span>
       </div>
 
-      {/* List Feed */}
-      <div className="space-y-2.5 overflow-y-auto max-h-[380px] pr-1">
+      {/* Daftar Pembacaan */}
+      <div className="space-y-3 overflow-y-auto max-h-[360px] pr-1">
         {metrics.length === 0 ? (
-          <div className="py-12 text-center text-neutral-400 text-sm">
-            Belum ada data telemetri. Pastikan ESP32 Wokwi sedang berjalan!
+          <div className="py-10 text-center text-[#71717A] text-[15px]">
+            Belum ada data pembacaan. Pastikan jam tangan dalam kondisi aktif.
           </div>
         ) : (
           metrics.map((item) => {
@@ -35,74 +37,97 @@ export const TelemetryFeed: React.FC<TelemetryFeedProps> = ({ metrics }) => {
               minute: '2-digit',
               second: '2-digit',
             });
+            const tempValue = item.temperature ?? item.room_temp;
+            const sourceLabel = item.device_type === 'home' ? 'Sensor rumah' : 'Jam tangan';
 
             return (
               <div
                 key={item.id}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                className={`flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 p-4 rounded-[16px] border transition-colors duration-180 ${
                   isCrit
-                    ? 'border-red-200 bg-red-50/40 hover:bg-red-50/70'
+                    ? 'border-[#FECACA] bg-[#FEF2F2]'
                     : isWarn
-                    ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
-                    : 'border-neutral-100 bg-[#FAFAFA] hover:bg-neutral-100/70'
+                    ? 'border-[#FDE68A] bg-[#FFFBEB]'
+                    : 'border-[#E5E3DD] bg-[#FAF9F7] hover:bg-[#F3F2EE]'
                 }`}
               >
-                {/* Left: Icon & Metric Values */}
-                <div className="flex items-center gap-3">
+                {/* Kiri: Ikon & Nilai */}
+                <div className="flex items-center gap-3.5 min-w-0">
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                       isCrit
-                        ? 'bg-red-100 text-red-600'
+                        ? 'bg-red-100 text-[#DC2626]'
                         : isWarn
-                        ? 'bg-amber-100 text-amber-600'
-                        : 'bg-neutral-200 text-neutral-700'
+                        ? 'bg-amber-100 text-[#D97706]'
+                        : 'bg-[#F0FDF4] text-[#15803D]'
                     }`}
                   >
                     {isCrit || isWarn ? (
-                      <AlertCircle className="w-5 h-5" />
+                      <AlertCircle className="w-5 h-5" aria-hidden="true" />
                     ) : (
-                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
                     )}
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-neutral-900">
-                        {item.heart_rate} <span className="text-xs font-medium text-neutral-400">BPM</span>
-                      </span>
-                      <span className="text-neutral-300">•</span>
-                      <span className="text-sm font-bold text-neutral-900">
-                        {Number(item.temperature).toFixed(1)} <span className="text-xs font-medium text-neutral-400">°C</span>
-                      </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[15px] font-semibold text-[#18181B]">
+                      {item.heart_rate !== null && item.heart_rate !== undefined && (
+                        <span>
+                          {item.heart_rate}{' '}
+                          <span className="text-[13px] font-normal text-[#52525B]">BPM</span>
+                        </span>
+                      )}
+                      {item.heart_rate !== null &&
+                        item.heart_rate !== undefined &&
+                        tempValue !== null &&
+                        tempValue !== undefined && (
+                          <span className="text-[#D4D1C9]" aria-hidden="true">
+                            ·
+                          </span>
+                        )}
+                      {tempValue !== null && tempValue !== undefined && (
+                        <span>
+                          {Number(tempValue).toFixed(1)}{' '}
+                          <span className="text-[13px] font-normal text-[#52525B]">°C</span>
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-medium mt-0.5">
-                      <Clock className="w-3 h-3" />
+
+                    <div className="flex items-center gap-1.5 text-[13px] text-[#52525B] mt-0.5">
+                      <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       <span>{timeStr}</span>
-                      <span>•</span>
-                      <span>{item.device_id}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">{sourceLabel}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Status Pill Badge & Action */}
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
-                      isCrit
-                        ? 'bg-red-600 text-white'
-                        : isWarn
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-neutral-900 text-white'
-                    }`}
-                  >
-                    {item.health_status}
-                  </span>
+                {/* Kanan: Pill Status Warna + Ikon + Teks */}
+                <div className="shrink-0">
+                  {isCrit ? (
+                    <span className="hc-chip bg-white text-[#991B1B] border border-[#FECACA]">
+                      <AlertCircle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                      <span>Kritis</span>
+                    </span>
+                  ) : isWarn ? (
+                    <span className="hc-chip bg-white text-[#92400E] border border-[#FDE68A]">
+                      <AlertCircle className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+                      <span>Peringatan</span>
+                    </span>
+                  ) : (
+                    <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                      <span>Normal</span>
+                    </span>
+                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
-    </div>
+    </section>
   );
 };
+
+export default TelemetryFeed;

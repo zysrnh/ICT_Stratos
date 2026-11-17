@@ -17,7 +17,7 @@ interface NavProps {
   onLogout?: () => void;
 }
 
-// 1. Sidebar Khusus Layar Tablet & Desktop (>= md) - Flat Minimalist
+// 1. Sidebar Khusus Layar Tablet & Desktop (>= md)
 export const Sidebar: React.FC<NavProps> = ({
   activeTab,
   setActiveTab,
@@ -26,136 +26,159 @@ export const Sidebar: React.FC<NavProps> = ({
   onLogout,
 }) => {
   const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Health Biometrics' },
-    { id: 'home', icon: ShieldAlert, label: 'Home Safety & Events', badge: alertCount },
-    { id: 'companion', icon: Bot, label: 'AI Companion' },
-    { id: 'family', icon: Users2, label: 'Family & Consent' },
-    { id: 'settings', icon: Settings, label: 'Pengaturan Sistem' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Ringkasan kesehatan' },
+    { id: 'home', icon: ShieldAlert, label: 'Keamanan rumah', badge: alertCount },
+    { id: 'companion', icon: Bot, label: 'Pendamping' },
+    { id: 'family', icon: Users2, label: 'Keluarga & izin' },
+    { id: 'settings', icon: Settings, label: 'Pengaturan' },
   ];
 
   return (
-    <aside className="hidden md:flex w-20 lg:w-22 flex-col items-center py-6 px-2 bg-[#111111] text-white rounded-none border-r border-neutral-800 shrink-0 select-none">
-      {/* Brand Icon / Logo Huawei Health Ecosystem */}
-      <div className="mb-8 flex flex-col items-center">
-        <div className="w-11 h-11 rounded-none bg-white text-[#111111] flex items-center justify-center font-extrabold text-xl tracking-tighter shadow-xs">
+    <aside
+      aria-label="Navigasi utama"
+      className="hidden md:flex w-20 flex-col items-center py-6 px-2.5 bg-[#1C1C1F] text-white shrink-0 select-none z-20"
+    >
+      {/* Satu Logo Tunggal */}
+      <div className="mb-8 flex items-center justify-center">
+        <div
+          className="w-11 h-11 rounded-[14px] bg-white/12 border border-white/15 text-white flex items-center justify-center font-semibold text-lg"
+          aria-label="Sahabat Lansia"
+        >
           H.
         </div>
-        <span className="text-[9px] font-bold tracking-wider text-neutral-400 mt-1.5 uppercase">ECA</span>
       </div>
 
-      {/* Nav Menu Icons */}
-      <nav className="flex-1 flex flex-col items-center gap-3 w-full">
+      {/* Menu Navigasi */}
+      <nav className="flex-1 flex flex-col items-center gap-2.5 w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              title={item.label}
-              className={`relative w-12 h-12 rounded-none flex items-center justify-center transition-colors cursor-pointer border ${
-                isActive
-                  ? 'bg-white text-[#111111] border-white font-bold'
-                  : 'text-neutral-400 border-transparent hover:text-white hover:bg-neutral-900'
-              }`}
-            >
-              <Icon className="w-5 h-5 stroke-[2]" />
-              {item.badge && item.badge > 0 ? (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-bold rounded-none flex items-center justify-center">
-                  {item.badge}
-                </span>
-              ) : null}
-            </button>
+            <div key={item.id} className="relative group flex items-center justify-center w-full">
+              <button
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                aria-label={item.label}
+                aria-current={isActive ? 'page' : undefined}
+                className={`relative w-12 h-12 rounded-[14px] flex items-center justify-center transition-all duration-180 ease-out cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-[#18181B] shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon className="w-5 h-5 stroke-[1.9]" />
+                {item.badge && item.badge > 0 ? (
+                  <span
+                    aria-label={`${item.badge} peringatan aktif`}
+                    className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-[#DC2626] text-white text-[11px] font-semibold rounded-full flex items-center justify-center ring-2 ring-[#1C1C1F]"
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+              </button>
+
+              {/* Tooltip Label saat Hover */}
+              <span
+                role="tooltip"
+                className="pointer-events-none opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 ease-out absolute left-[calc(100%+10px)] whitespace-nowrap px-3 py-1.5 rounded-full bg-[#18181B] text-white text-[13px] font-medium shadow-md border border-white/10 z-40"
+              >
+                {item.label}
+              </span>
+            </div>
           );
         })}
       </nav>
 
-      {/* Bottom Profile / Pairing Token Access & Disconnect */}
-      <div className="mt-auto pt-4 border-t border-neutral-800 w-full flex flex-col items-center gap-2">
-        <button
-          onClick={onOpenAuth}
-          title="Ganti Jam Tangan / Token ID"
-          className="w-10 h-10 rounded-none flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors cursor-pointer"
-        >
-          <KeyRound className="w-4 h-4" />
-        </button>
+      {/* Kontrol Bawah: Ganti Jam & Keluar */}
+      <div className="mt-auto pt-4 border-t border-white/10 w-full flex flex-col items-center gap-2">
+        <div className="relative group flex items-center justify-center">
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            aria-label="Ganti jam tangan"
+            className="w-11 h-11 rounded-[14px] flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors duration-180 cursor-pointer"
+          >
+            <KeyRound className="w-[18px] h-[18px]" />
+          </button>
+          <span
+            role="tooltip"
+            className="pointer-events-none opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 ease-out absolute left-[calc(100%+10px)] whitespace-nowrap px-3 py-1.5 rounded-full bg-[#18181B] text-white text-[13px] font-medium shadow-md border border-white/10 z-40"
+          >
+            Ganti jam tangan
+          </span>
+        </div>
 
         {onLogout && (
-          <button
-            onClick={onLogout}
-            title="Putuskan Jam / Keluar"
-            className="w-10 h-10 rounded-none flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-neutral-900 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="relative group flex items-center justify-center">
+            <button
+              type="button"
+              onClick={onLogout}
+              aria-label="Putuskan koneksi"
+              className="w-11 h-11 rounded-[14px] flex items-center justify-center text-red-300 hover:text-red-200 hover:bg-red-500/15 transition-colors duration-180 cursor-pointer"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 ease-out absolute left-[calc(100%+10px)] whitespace-nowrap px-3 py-1.5 rounded-full bg-[#18181B] text-white text-[13px] font-medium shadow-md border border-white/10 z-40"
+            >
+              Putuskan koneksi
+            </span>
+          </div>
         )}
       </div>
     </aside>
   );
 };
 
-// 2. Docked Bottom Navigation Bar Khusus Mobile (< md) - Flat Docked Bar Anti Menutupi Konten
+// 2. Navigasi Bawah Khusus Mobile (< md)
 export const BottomNav: React.FC<NavProps> = ({
   activeTab,
   setActiveTab,
   alertCount,
-  onOpenAuth,
-  onLogout,
 }) => {
   const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Health' },
-    { id: 'home', icon: ShieldAlert, label: 'Safety', badge: alertCount },
-    { id: 'companion', icon: Bot, label: 'AI' },
-    { id: 'family', icon: Users2, label: 'Family' },
-    { id: 'settings', icon: Settings, label: 'Config' },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Beranda' },
+    { id: 'home', icon: ShieldAlert, label: 'Rumah', badge: alertCount },
+    { id: 'companion', icon: Bot, label: 'Sahabat' },
+    { id: 'family', icon: Users2, label: 'Keluarga' },
+    { id: 'settings', icon: Settings, label: 'Atur' },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#111111] text-white rounded-none py-1.5 px-1 z-50 border-t border-neutral-800 flex items-center justify-around select-none">
+    <nav
+      aria-label="Navigasi seluler"
+      className="md:hidden fixed bottom-0 inset-x-0 bg-[#1C1C1F] text-white py-2 px-2 z-40 border-t border-white/10 flex items-center justify-around gap-1 select-none"
+    >
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
         return (
           <button
             key={item.id}
+            type="button"
             onClick={() => setActiveTab(item.id)}
-            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-none transition-colors cursor-pointer ${
+            aria-label={item.label}
+            aria-current={isActive ? 'page' : undefined}
+            className={`relative flex-1 min-h-[44px] flex flex-col items-center justify-center py-1.5 px-1 rounded-[12px] transition-colors duration-180 cursor-pointer ${
               isActive
-                ? 'text-white font-bold bg-neutral-900 border-b-2 border-white'
+                ? 'bg-white/15 text-white font-medium'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Icon className="w-4 h-4" />
-            <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+            <Icon className="w-[18px] h-[18px]" />
+            <span className="text-xs mt-0.5 leading-tight">{item.label}</span>
             {item.badge && item.badge > 0 ? (
-              <span className="absolute top-0 right-1 w-3.5 h-3.5 bg-red-600 text-white text-[8px] font-bold rounded-none flex items-center justify-center">
+              <span
+                aria-label={`${item.badge} peringatan`}
+                className="absolute top-1 right-2 min-w-[16px] h-4 px-1 bg-[#DC2626] text-white text-[10px] font-semibold rounded-full flex items-center justify-center"
+              >
                 {item.badge}
               </span>
             ) : null}
           </button>
         );
       })}
-
-      {/* Tombol Pairing Mobile */}
-      <button
-        onClick={onOpenAuth}
-        title="Ganti Jam"
-        className="flex flex-col items-center justify-center py-1 px-2 rounded-none text-neutral-400 hover:text-white transition-colors cursor-pointer"
-      >
-        <KeyRound className="w-4 h-4" />
-        <span className="text-[10px] mt-0.5 tracking-tight">Token</span>
-      </button>
-
-      {onLogout && (
-        <button
-          onClick={onLogout}
-          title="Keluar"
-          className="flex flex-col items-center justify-center py-1 px-2 rounded-none text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Keluar</span>
-        </button>
-      )}
     </nav>
   );
 };

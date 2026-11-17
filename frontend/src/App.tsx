@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Watch,
+  ShieldCheck,
+  CheckCircle2,
+  ChevronDown,
+  AlertTriangle,
+} from 'lucide-react';
 import { Sidebar, BottomNav } from './components/Sidebar';
 import { Header } from './components/Header';
 import { StatCards } from './components/StatCards';
@@ -38,6 +45,11 @@ export const App: React.FC = () => {
   const [session, setSession] = useState<AuthSession | null>(() => getSavedSession());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
+  // State UI Pengaturan (konfirmasi putuskan koneksi & accordion detail teknis)
+  const [isDisconnectConfirmOpen, setIsDisconnectConfirmOpen] = useState<boolean>(false);
+  const [isTechAccordionOpen, setIsTechAccordionOpen] = useState<boolean>(false);
+  const [lastSyncSeconds, setLastSyncSeconds] = useState<number>(1);
+
   const activePatientId = session?.patient_id ?? 1;
 
   const loadAllData = useCallback(async () => {
@@ -55,8 +67,10 @@ export const App: React.FC = () => {
       setEvents(emergencyEvents);
       setAlerts(activeAlerts);
       setContacts(emergencyContacts);
+      setLastSyncSeconds(1);
     } catch (err) {
       console.error('[App Polling Error]:', err);
+      setLastSyncSeconds((prev) => Math.min(prev + 1, 60));
     }
   }, [session, activePatientId]);
 
@@ -83,6 +97,7 @@ export const App: React.FC = () => {
     setAlerts([]);
     setContacts([]);
     setIsAuthModalOpen(false);
+    setIsDisconnectConfirmOpen(false);
   };
 
   const handleResolveEvent = async (eventId: string) => {
@@ -92,6 +107,14 @@ export const App: React.FC = () => {
       loadAllData();
     }
   };
+
+  // Ekstraksi data metrik terbaru untuk Watch dan Home Node
+  const latestWatchMetric =
+    metrics.find((m) => m.device_type === 'watch') ||
+    (metrics.length > 0 ? metrics[0] : null);
+
+  const latestHomeMetric =
+    metrics.find((m) => m.device_type === 'home' || m.room_temp !== null) || null;
 
   const handleTriggerSim = async (type: 'FALL' | 'SOS' | 'SMOKE') => {
     try {
@@ -160,14 +183,6 @@ export const App: React.FC = () => {
     );
   }
 
-  // Ekstraksi data metrik terbaru untuk Watch dan Home Node
-  const latestWatchMetric =
-    metrics.find((m) => m.device_type === 'watch') ||
-    (metrics.length > 0 ? metrics[0] : null);
-
-  const latestHomeMetric =
-    metrics.find((m) => m.device_type === 'home' || m.room_temp !== null) || null;
-
   const primaryContact =
     contacts.find((c) => c.is_primary) || (contacts.length > 0 ? contacts[0] : null);
 
@@ -176,141 +191,54 @@ export const App: React.FC = () => {
     alerts.length;
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] flex flex-col md:flex-row overflow-x-hidden font-sans">
-      {/* 1. Flat Sidebar (Tablet & Desktop >= md) */}
+    <div className="min-h-screen bg-[#F7F6F3] flex flex-col md:flex-row w-full min-w-0">
+      {/* 1. Navigasi Samping (Tablet & Desktop >= md) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         alertCount={activeAlertCount}
         onOpenAuth={() => setIsAuthModalOpen(true)}
-        onLogout={handleLogout}
+        onLogout={() => setIsDisconnectConfirmOpen(true)}
       />
 
-      {/* 2. Main Dashboard Content (Padding bawah aman untuk BottomNav di HP) */}
-      <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1440px] mx-auto w-full pb-24 md:pb-8 overflow-y-auto">
-        {/* Banner Alert Kejadian Darurat Aktif (Flat & Tegas) */}
+      {/* 2. Konten Utama */}
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-[1280px] mx-auto w-full pb-28 md:pb-10">
+        {/* Header Bar Ramah dengan Popover Mode Simulasi & Avatar Menu */}
+        <Header
+          alertCount={activeAlertCount}
+          session={session}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onLogout={() => setIsDisconnectConfirmOpen(true)}
+          onTriggerSim={handleTriggerSim}
+          onResetNormal={handleResetNormal}
+          onGoToSettings={() => setActiveTab('settings')}
+          onGoToSafety={() => setActiveTab('home')}
+          lastUpdatedText={`Diperbarui ${lastSyncSeconds} detik lalu`}
+        />
+
+        {/* Banner Alert Ringkas (Tampil di Semua Halaman Hanya Saat Darurat Aktif) */}
         <EmergencyAlertBanner
           events={events}
           primaryContact={primaryContact}
           onResolve={handleResolveEvent}
         />
 
-        {/* Header Bar Clean & Flat */}
-        <Header
-          alertCount={activeAlertCount}
-          session={session}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
-          onLogout={handleLogout}
-        />
-
-        {/* Panel Status Sinkronisasi Realtime & Pengujian Darurat */}
-        <div className="mb-6 bg-white border-2 border-neutral-900 p-3 sm:p-4 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-neutral-200">
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-3 w-3 bg-emerald-600"></span>
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
-                    SINKRONISASI REALTIME AKTIF (1 DETIK)
-                  </span>
-                  <span className="text-[10px] bg-neutral-900 text-white font-mono px-1.5 py-0.5">
-                    {session?.token}
-                  </span>
-                </div>
-                <p className="text-[11px] text-neutral-500">
-                  Terhubung ke <strong>{session?.patient_name}</strong> • Data biometrik diperbarui langsung dari ESP32 Wokwi.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-neutral-500 text-[11px]">Status Darurat:</span>
-              {activeAlertCount > 0 ? (
-                <span className="bg-rose-600 text-white font-bold px-2 py-0.5 text-[10px] uppercase animate-pulse">
-                  🚨 {activeAlertCount} Kejadian Darurat Aktif!
-                </span>
-              ) : (
-                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 text-[10px] uppercase">
-                  ✓ Semua Normal & Aman
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Tombol-tombol Uji Coba yang Jelas, Kontras & Informatif */}
-          <div className="pt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-black text-neutral-700 uppercase tracking-wider mr-1">
-              UJI SKENARIO:
-            </span>
-
-            <button
-              type="button"
-              onClick={() => handleTriggerSim('FALL')}
-              className="px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-amber-500 transition-colors cursor-pointer flex items-center gap-1.5"
-              title="Simulasikan lansia terjatuh (Benturan IMU MPU6050)"
-            >
-              <span>🚨 Uji Jatuh</span>
-              <span className="text-[10px] text-amber-700 font-normal hidden sm:inline">(Impact 3.5G)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTriggerSim('SOS')}
-              className="px-3 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-900 border-2 border-rose-500 transition-colors cursor-pointer flex items-center gap-1.5"
-              title="Simulasikan penekanan tombol fisik SOS di jam tangan"
-            >
-              <span>🆘 Uji Tombol SOS</span>
-              <span className="text-[10px] text-rose-700 font-normal hidden sm:inline">(Panik)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTriggerSim('SMOKE')}
-              className="px-3 py-1.5 text-xs font-bold bg-orange-50 hover:bg-orange-100 text-orange-900 border-2 border-orange-500 transition-colors cursor-pointer flex items-center gap-1.5"
-              title="Simulasikan sensor asap/gas MQ-2 terdeteksi pekat"
-            >
-              <span>🔥 Uji Kebakaran / Asap</span>
-              <span className="text-[10px] text-orange-700 font-normal hidden sm:inline">(MQ-2 &gt; 2500)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResetNormal}
-              className="ml-auto px-4 py-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white border-2 border-emerald-900 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-              title="Selesaikan semua alarm & kembalikan status ke Normal"
-            >
-              <span>✅ Reset Normal</span>
-              <span className="text-[10px] text-emerald-200 font-normal hidden sm:inline">(Matikan Alarm)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Tab 1: Health Monitoring (Default) */}
+        {/* Tab 1: Ringkasan Kesehatan (Default) */}
         {activeTab === 'dashboard' && (
-          <>
-            {/* Top 4 Stat Metric Cards (Watch + Home Node Combined) */}
+          <div className="space-y-8">
             <StatCards
               latestMetric={latestWatchMetric}
               homeMetric={latestHomeMetric}
               activeEvents={events}
             />
 
-            {/* Biometric Chart Full-Width */}
-            <div className="w-full mb-6">
-              <SmoothBiometricChart metrics={metrics} />
-            </div>
+            <SmoothBiometricChart metrics={metrics} />
 
-            {/* Bottom Section: Live Telemetry Stream Feed */}
-            <div className="w-full">
-              <TelemetryFeed metrics={metrics} />
-            </div>
-          </>
+            <TelemetryFeed metrics={metrics} />
+          </div>
         )}
 
-        {/* Tab 2: Home Safety & Environmental Node */}
+        {/* Tab 2: Keamanan Rumah */}
         {activeTab === 'home' && (
           <HomeSafetyView
             events={events}
@@ -320,74 +248,189 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* Tab 3: AI Companionship & Reminders */}
+        {/* Tab 3: Pendamping & Jadwal */}
         {activeTab === 'companion' && <AiCompanionView session={session} />}
 
-        {/* Tab 4: Family Connection & UU PDP Consent */}
+        {/* Tab 4: Keluarga & Persetujuan Data */}
         {activeTab === 'family' && <FamilyPrivacyView session={session} />}
 
-        {/* Tab 5: Settings & Arsitektur Sistem */}
+        {/* Tab 5: Pengaturan */}
         {activeTab === 'settings' && (
-          <div className="bg-white rounded-none p-5 sm:p-6 border border-neutral-200 shadow-xs space-y-6">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-[#111111]">
-                Informasi &amp; Arsitektur Sistem
-              </h3>
-              <p className="text-xs text-neutral-500 mt-1">
-                AI-Powered Elderly Care Ecosystem — Solusi Pemantauan dan Pendampingan Lansia Berbasis AI &amp; IoT.
+          <div className="space-y-8">
+            <div className="hc-card p-6">
+              <h2 className="text-xl font-semibold text-[#18181B]">Pengaturan</h2>
+              <p className="text-[15px] text-[#52525B] mt-1 mb-6">
+                Kelola koneksi jam tangan pintar dan perlindungan data keluarga.
               </p>
+
+              {/* Layout 2 Kolom Seimbang */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Kolom 1: Jam Terhubung */}
+                <section
+                  aria-label="Jam terhubung"
+                  className="p-6 rounded-[20px] bg-[#FAF9F7] border border-[#E5E3DD] flex flex-col justify-between gap-5"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white border border-[#E5E3DD] text-[#18181B] flex items-center justify-center shrink-0">
+                          <Watch className="w-5 h-5" aria-hidden="true" />
+                        </div>
+                        <h3 className="text-[16px] font-semibold text-[#18181B]">
+                          Jam terhubung
+                        </h3>
+                      </div>
+
+                      <span className="hc-chip bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" aria-hidden="true" />
+                        <span>Terhubung</span>
+                      </span>
+                    </div>
+
+                    <dl className="space-y-3 text-[15px]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <dt className="text-[#52525B]">Nama lansia</dt>
+                        <dd className="font-medium text-[#18181B]">{session?.patient_name}</dd>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <dt className="text-[#52525B]">Model jam</dt>
+                        <dd className="font-medium text-[#18181B]">
+                          {session?.paired_device?.model_name || 'Huawei Smart Health Band Pro'}
+                        </dd>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <dt className="text-[#52525B]">Kode perangkat</dt>
+                        <dd>
+                          <code className="hc-chip bg-white border border-[#E5E3DD] font-mono text-[13px] text-[#18181B]">
+                            {session?.token}
+                          </code>
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="hc-btn-secondary flex-1 sm:flex-initial px-4 py-2.5 text-[14px] cursor-pointer"
+                    >
+                      Ganti jam
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDisconnectConfirmOpen(true)}
+                      className="hc-btn-danger flex-1 sm:flex-initial px-4 py-2.5 text-[14px] cursor-pointer"
+                    >
+                      Putuskan koneksi
+                    </button>
+                  </div>
+                </section>
+
+                {/* Kolom 2: Keamanan Data (2-3 Baris + Ikon Centang) */}
+                <section
+                  aria-label="Keamanan data"
+                  className="p-6 rounded-[20px] bg-[#FAF9F7] border border-[#E5E3DD] flex flex-col justify-between gap-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-[#F0FDF4] text-[#15803D] flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+                      </div>
+                      <h3 className="text-[16px] font-semibold text-[#18181B]">
+                        Keamanan data
+                      </h3>
+                    </div>
+
+                    <ul className="space-y-3.5 text-[15px] text-[#18181B]">
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2
+                          className="w-5 h-5 text-[#15803D] shrink-0 mt-0.5"
+                          aria-hidden="true"
+                        />
+                        <span>Data kesehatan dienkripsi saat dikirim dan disimpan.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2
+                          className="w-5 h-5 text-[#15803D] shrink-0 mt-0.5"
+                          aria-hidden="true"
+                        />
+                        <span>Hanya dapat diakses oleh akun keluarga yang terhubung.</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2
+                          className="w-5 h-5 text-[#15803D] shrink-0 mt-0.5"
+                          aria-hidden="true"
+                        />
+                        <span>Dikelola sesuai UU Pelindungan Data Pribadi No. 27/2022.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </section>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 bg-neutral-50 border border-neutral-200 space-y-2">
-                <span className="font-bold text-neutral-900 block">Sesi Perangkat yang Sedang Aktif:</span>
+            {/* Accordion Detail Teknis (Tertutup Default) */}
+            <section aria-label="Detail teknis infrastruktur" className="hc-card overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsTechAccordionOpen((prev) => !prev)}
+                aria-expanded={isTechAccordionOpen}
+                className="w-full min-h-[56px] px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-[#FAF9F7] transition-colors cursor-pointer"
+              >
                 <div>
-                  • Token ID Jam: <code className="bg-neutral-200 px-1.5 py-0.5 font-bold font-mono">{session?.token}</code>
+                  <span className="text-[16px] font-semibold text-[#18181B] block">
+                    Detail teknis
+                  </span>
+                  <span className="text-[13px] text-[#52525B]">
+                    Informasi basis data, protokol koneksi, dan isolasi perangkat
+                  </span>
                 </div>
-                <div>
-                  • Nama Lansia: <strong>{session?.patient_name}</strong> (ID: {session?.patient_id})
-                </div>
-                <div>
-                  • Model Jam: <code className="bg-neutral-200 px-1.5 py-0.5">Huawei Smart Health Band Pro</code>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setIsAuthModalOpen(true)}
-                    className="px-3 py-1.5 bg-[#111111] text-white font-bold text-xs uppercase cursor-pointer hover:bg-neutral-800 rounded-none"
-                  >
-                    Ganti Jam / Token
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="px-3 py-1.5 bg-red-600 text-white font-bold text-xs uppercase cursor-pointer hover:bg-red-700 rounded-none"
-                  >
-                    Putuskan Koneksi
-                  </button>
-                </div>
-              </div>
+                <ChevronDown
+                  className={`w-5 h-5 text-[#52525B] shrink-0 transition-transform duration-180 ${
+                    isTechAccordionOpen ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
 
-              <div className="p-4 bg-neutral-50 border border-neutral-200 space-y-2">
-                <span className="font-bold text-neutral-900 block">Infrastruktur Multi-Tenant &amp; Keamanan:</span>
-                <div>• Database: Huawei Cloud RDS / MySQL 8.0 — Terhubung Normal</div>
-                <div>• Isolasi Data: Data difilter ketat per <code>device_token</code> &amp; <code>patient_id</code></div>
-                <div>• Protokol: Enkripsi REST API over TLS / Bearer Token</div>
-                <div>• Kepatuhan: UU No. 27/2022 Pelindungan Data Pribadi</div>
-              </div>
-            </div>
+              {isTechAccordionOpen && (
+                <div className="px-6 pb-6 pt-4 border-t border-[#E5E3DD] grid grid-cols-1 sm:grid-cols-2 gap-4 text-[14px] text-[#52525B] hc-fade-soft">
+                  <div>
+                    <span className="font-semibold text-[#18181B] block mb-0.5">Basis data</span>
+                    <span>Huawei Cloud RDS (MySQL 8.0) terhubung</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#18181B] block mb-0.5">Protokol</span>
+                    <span>REST API terenkripsi HTTPS/TLS dengan otorisasi token perangkat</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#18181B] block mb-0.5">Isolasi data</span>
+                    <span>
+                      Setiap pemantauan dipisahkan per token perangkat dan identitas lansia
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#18181B] block mb-0.5">Kepatuhan</span>
+                    <span>UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi</span>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         )}
       </main>
 
-      {/* 3. Docked Flat Bottom Navigation Bar (Layar HP < md) */}
+      {/* 3. Navigasi Bawah Khusus Mobile (< md) */}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         alertCount={activeAlertCount}
         onOpenAuth={() => setIsAuthModalOpen(true)}
-        onLogout={handleLogout}
+        onLogout={() => setIsDisconnectConfirmOpen(true)}
       />
 
-      {/* 4. Modal Pairing & Ganti Token */}
+      {/* 4. Modal Pairing & Ganti Jam */}
       <LoginModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -395,6 +438,53 @@ export const App: React.FC = () => {
         currentSession={session}
         isFullScreen={false}
       />
+
+      {/* 5. Dialog Konfirmasi Putuskan Koneksi */}
+      {isDisconnectConfirmOpen && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="disconnect-title"
+          aria-describedby="disconnect-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 hc-fade-soft"
+        >
+          <div
+            className="w-full max-w-sm bg-white border border-[#E5E3DD] rounded-[20px] p-6"
+            style={{ boxShadow: 'var(--shadow-popover)' }}
+          >
+            <div className="flex items-start gap-3.5 mb-4">
+              <div className="w-11 h-11 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 id="disconnect-title" className="text-lg font-semibold text-[#18181B]">
+                  Putuskan koneksi?
+                </h2>
+                <p id="disconnect-desc" className="text-[14px] text-[#52525B] mt-1 leading-relaxed">
+                  Pemantauan untuk {session?.patient_name} akan dihentikan sementara hingga Anda menghubungkan kembali jam tangan.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDisconnectConfirmOpen(false)}
+                className="hc-btn-secondary px-4 py-2.5 text-[14px] cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="hc-btn-danger px-4 py-2.5 text-[14px] cursor-pointer"
+              >
+                Ya, putuskan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

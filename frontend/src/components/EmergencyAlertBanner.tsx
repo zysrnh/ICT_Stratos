@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, PhoneCall, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Clock, PhoneCall, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import type { EmergencyEvent, EmergencyContact } from '../types/telemetry';
 
 interface AlertBannerProps {
@@ -13,7 +13,7 @@ export const EmergencyAlertBanner: React.FC<AlertBannerProps> = ({
   primaryContact,
   onResolve,
 }) => {
-  // Cari event aktif yang belum resolved/cancelled
+  // Tampilkan hanya saat ada kejadian darurat aktif
   const activeEvent = events.find(
     (e) => e.status === 'PENDING' || e.status === 'ESCALATED'
   );
@@ -22,88 +22,103 @@ export const EmergencyAlertBanner: React.FC<AlertBannerProps> = ({
 
   const isEscalated = activeEvent.status === 'ESCALATED';
 
+  const getEventTitle = (eventType: string) => {
+    switch (eventType) {
+      case 'FALL':
+        return 'Lansia terdeteksi jatuh';
+      case 'SOS':
+        return 'Tombol SOS ditekan';
+      case 'SMOKE':
+        return 'Peringatan asap di rumah';
+      case 'HR_ABNORMAL':
+        return 'Detak jantung tidak normal';
+      default:
+        return 'Kondisi perlu perhatian';
+    }
+  };
+
   return (
-    <div
-      className={`w-full mb-5 p-4 sm:p-5 rounded-none border-2 transition-all shadow-xs ${
+    <section
+      role="alert"
+      aria-live="assertive"
+      className={`w-full mb-8 p-5 sm:p-6 rounded-[20px] border transition-all duration-200 ease-out hc-fade-soft ${
         isEscalated
-          ? 'bg-rose-50 border-rose-600 text-rose-950'
-          : 'bg-amber-50 border-amber-500 text-amber-950'
+          ? 'bg-[#FEF2F2] border-[#FECACA] text-[#18181B]'
+          : 'bg-[#FFFBEB] border-[#FDE68A] text-[#18181B]'
       }`}
+      style={{ boxShadow: 'var(--shadow-card)' }}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        {/* Left: Event Details */}
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Kiri: Ikon + Ringkasan Kejadian */}
+        <div className="flex items-start sm:items-center gap-4 min-w-0">
           <div
-            className={`w-10 h-10 rounded-none flex items-center justify-center shrink-0 ${
+            className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${
               isEscalated
-                ? 'bg-rose-600 text-white animate-pulse'
-                : 'bg-amber-500 text-white'
+                ? 'bg-[#DC2626] text-white hc-pulse-critical'
+                : 'bg-[#D97706] text-white'
             }`}
           >
             {isEscalated ? (
-              <ShieldAlert className="w-5 h-5" />
+              <ShieldAlert className="w-5 h-5" aria-hidden="true" />
             ) : (
-              <AlertCircle className="w-5 h-5" />
+              <AlertCircle className="w-5 h-5" aria-hidden="true" />
             )}
           </div>
-          <div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-none bg-white border border-current">
-                {activeEvent.event_type} • {activeEvent.severity}
-              </span>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-base sm:text-lg font-semibold text-[#18181B]">
+                {getEventTitle(activeEvent.event_type)}
+              </h2>
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-none ${
+                className={`hc-chip ${
                   isEscalated
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-amber-500 text-white'
+                    ? 'bg-white text-[#991B1B] border border-[#FECACA]'
+                    : 'bg-white text-[#92400E] border border-[#FDE68A]'
                 }`}
               >
-                {isEscalated ? 'ESKALASI DARURAT KELUARGA' : 'VERIFIKASI DI JAM TANGAN'}
+                {isEscalated ? (
+                  <AlertCircle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                ) : (
+                  <Clock className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+                )}
+                <span>{isEscalated ? 'Kritis' : 'Menunggu respons'}</span>
               </span>
-              {activeEvent.sim && (
-                <span className="text-[10px] font-mono bg-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded-none">
-                  SIM
-                </span>
-              )}
             </div>
-            <h3 className="text-base sm:text-lg font-black mt-1">
-              {activeEvent.event_type === 'FALL' && 'Lansia Terdeteksi Jatuh!'}
-              {activeEvent.event_type === 'SOS' && 'Tombol Darurat SOS Ditekan!'}
-              {activeEvent.event_type === 'SMOKE' && 'Peringatan Asap / Potensi Kebakaran!'}
-              {activeEvent.event_type === 'HR_ABNORMAL' && 'Detak Jantung Tidak Normal Bertahan!'}
-            </h3>
-            <p className="text-xs text-neutral-700 mt-0.5">
+
+            <p className="text-[14px] sm:text-[15px] text-[#52525B] mt-1">
               {isEscalated
-                ? activeEvent.escalated_to ||
-                  'Lansia tidak merespons jam tangan. Notifikasi darurat diteruskan ke keluarga utama.'
-                : 'Layar jam tangan sedang meminta konfirmasi lansia (Tekan OK jika aman). Menunggu respons...'}
+                ? 'Belum ada respons di jam tangan; keluarga dimohon segera memastikan kondisi lansia.'
+                : 'Layar jam tangan sedang meminta konfirmasi aman dari lansia.'}
             </p>
           </div>
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end pt-2 sm:pt-0">
+        {/* Kanan: Aksi Cepat */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0 w-full lg:w-auto">
           {primaryContact && (
             <a
               href={`tel:${primaryContact.phone_number}`}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#111111] text-white rounded-none text-xs font-bold hover:bg-neutral-800 transition-colors cursor-pointer shadow-xs"
+              className="flex-1 sm:flex-initial hc-btn-primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[15px] cursor-pointer"
             >
-              <PhoneCall className="w-3.5 h-3.5" />
+              <PhoneCall className="w-4 h-4" aria-hidden="true" />
               <span>Hubungi {primaryContact.name.split(' ')[0]}</span>
             </a>
           )}
+
           {onResolve && (
             <button
+              type="button"
               onClick={() => onResolve(activeEvent.event_id)}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 px-3.5 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-none text-xs font-bold hover:bg-neutral-100 transition-colors cursor-pointer shadow-xs"
+              className="flex-1 sm:flex-initial hc-btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[15px] cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <CheckCircle2 className="w-4 h-4 text-[#15803D]" aria-hidden="true" />
               <span>Selesaikan</span>
             </button>
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
