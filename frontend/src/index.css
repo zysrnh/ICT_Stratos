@@ -80,11 +80,6 @@
   }
 }
 
-.bg-dot-grid {
-  background-image: radial-gradient(rgba(148, 163, 184, 0.28) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
 /* Pola Komponen Seragam */
 .hc-card {
   background-color: var(--bg-surface);

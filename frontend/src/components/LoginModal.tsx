@@ -6,6 +6,7 @@ import {
   QrCode,
   Watch,
   ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 import { pairDevice, loginAuth } from '../services/api';
 import type { AuthSession } from '../types/telemetry';
@@ -180,31 +181,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  // Card Konten Login / Konfigurasi
+  // Card Form Login / Pairing
   const renderCardContent = () => (
     <div className="w-full">
-      {/* Header Kartu: Mark Minimalis + Judul & Subtitle */}
+      {/* Header Kartu: Logo Mini + Judul & Deskripsi */}
       <div className="flex items-start justify-between gap-3 mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className="w-7 h-7 rounded-lg bg-[#0F172A] text-white flex items-center justify-center font-semibold text-[13px] shrink-0"
-              aria-hidden="true"
-            >
-              E
-            </div>
-            <span className="text-[12px] font-semibold tracking-wider text-[#0F172A] uppercase">
-              ELDERA
-            </span>
+        <div className="flex items-start gap-3.5">
+          <div
+            className="w-10 h-10 rounded-[12px] bg-[#18181B] text-white flex items-center justify-center font-semibold text-base shrink-0"
+            aria-hidden="true"
+          >
+            H.
           </div>
-          <h2 id="pairing-title" className="text-[19px] font-semibold tracking-tight text-[#0F172A] leading-snug">
-            {step === 'scan' ? 'Hubungkan jam tangan' : 'Lengkapi profil lansia'}
-          </h2>
-          <p className="text-[13px] text-[#64748B] mt-1 leading-relaxed">
-            {step === 'scan'
-              ? 'Pindai QR di layar jam tangan atau masukkan 4 karakter kode perangkat.'
-              : 'Isi data singkat agar keluarga dapat memantau kondisi dengan tepat.'}
-          </p>
+          <div>
+            <h2 id="pairing-title" className="text-xl font-semibold text-[#18181B] leading-snug">
+              {step === 'scan' ? 'Hubungkan jam tangan' : 'Lengkapi profil lansia'}
+            </h2>
+            <p className="text-[14px] text-[#52525B] mt-1 leading-relaxed">
+              {step === 'scan'
+                ? 'Pindai QR di layar jam tangan atau masukkan 4 karakter kode perangkat.'
+                : 'Isi data singkat agar keluarga dapat memantau kondisi dengan tepat.'}
+            </p>
+          </div>
         </div>
 
         {!isFullScreen && currentSession && (
@@ -212,9 +210,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Tutup jendela hubungkan jam"
-            className="w-8 h-8 rounded-lg text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] flex items-center justify-center shrink-0 cursor-pointer transition-colors -mt-1 -mr-1"
+            className="w-9 h-9 rounded-full text-[#52525B] hover:bg-[#F3F2EE] flex items-center justify-center shrink-0 cursor-pointer transition-colors -mt-1 -mr-1"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
@@ -222,7 +220,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       {errorMsg && (
         <div
           role="alert"
-          className="mb-5 p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-[13px] flex items-start gap-2.5"
+          className="mb-5 p-3.5 rounded-[12px] bg-[#FEF2F2] border border-[#FECACA] text-[#991B1B] text-[13.5px] flex items-start gap-2.5"
         >
           <AlertCircle className="w-4 h-4 shrink-0 text-[#DC2626] mt-0.5" aria-hidden="true" />
           <span>{errorMsg}</span>
@@ -232,34 +230,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       {/* ================= LANGKAH 1: PINDAI QR ATAU MASUKKAN KODE ================= */}
       {step === 'scan' && (
         <div className="space-y-4">
-          {/* Primary Action: Sleek Obsidian Button */}
+          {/* Tombol Primer: Pindai QR */}
           <button
             type="button"
             onClick={() => setIsScannerOpen(true)}
-            className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#111827] hover:bg-[#1F2937] text-white text-[14px] font-medium flex items-center justify-center gap-2.5 transition-colors cursor-pointer shadow-xs"
+            className="hc-btn-primary w-full px-4 py-3 text-[15px] flex items-center justify-center gap-2.5 cursor-pointer"
           >
-            <QrCode className="w-4 h-4" aria-hidden="true" />
+            <QrCode className="w-[18px] h-[18px]" aria-hidden="true" />
             <span>Pindai QR</span>
           </button>
 
-          {/* Divider: Hairline tipis dengan teks muted "atau" */}
+          {/* Pemisah "atau" */}
           <div className="relative flex items-center justify-center my-3" aria-hidden="true">
-            <div className="border-t border-[#E5E7EB] w-full" />
-            <span className="bg-white px-3 text-[12px] font-medium text-[#94A3B8] shrink-0">atau</span>
-            <div className="border-t border-[#E5E7EB] w-full" />
+            <div className="border-t border-[#E5E3DD] w-full" />
+            <span className="bg-white px-3 text-[13px] text-[#71717A] shrink-0 font-medium">atau</span>
+            <div className="border-t border-[#E5E3DD] w-full" />
           </div>
 
-          {/* Input Kode 4 Karakter dengan Segmented Prefix + Tombol Masuk Emerald Teal */}
+          {/* Input Kode 4 Karakter dengan Prefix Chip + Tombol Masuk Ink */}
           <form onSubmit={handleNextToConfig} className="space-y-4">
             <div>
               <label
                 htmlFor="watch-code-input"
-                className="block text-[13px] font-medium text-[#334155] mb-1.5"
+                className="block text-[14px] font-medium text-[#18181B] mb-1.5"
               >
                 Kode jam tangan
               </label>
-              <div className="flex items-center gap-2 p-1.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] focus-within:border-[#0F172A] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#0F172A]/10 transition-all">
-                <span className="px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] font-mono text-[12px] font-semibold text-[#475569] shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2 p-1.5 rounded-[12px] border border-[#E5E3DD] bg-white focus-within:border-[#18181B] focus-within:ring-2 focus-within:ring-[#18181B]/10 transition-all">
+                <span className="hc-chip bg-[#F3F2EE] text-[#52525B] border border-[#E5E3DD] font-mono shrink-0 px-3 py-1.5 text-[13px]">
                   HUAWEI-ECA-
                 </span>
                 <input
@@ -276,38 +274,36 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   }}
                   placeholder="2730"
                   maxLength={8}
-                  className="flex-1 min-w-0 min-h-[36px] px-1 text-[15px] font-mono font-medium text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none bg-transparent uppercase"
+                  className="flex-1 min-w-0 min-h-[38px] px-2 text-[15px] font-mono font-medium text-[#18181B] placeholder:text-[#A1A1AA] focus:outline-none bg-transparent uppercase"
                 />
-                <Watch className="w-4 h-4 text-[#94A3B8] mr-2 shrink-0" aria-hidden="true" />
+                <Watch className="w-4 h-4 text-[#A1A1AA] mr-2 shrink-0" aria-hidden="true" />
               </div>
             </div>
 
-            {/* Submit Button: Solid Medical Teal (#0D9488) */}
+            {/* Tombol Masuk: Ink Primer Web Kita */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white text-[14px] font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+              className="hc-btn-primary w-full px-4 py-3 text-[15px] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <span>{loading ? 'Memeriksa kode...' : 'Masuk'}</span>
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </form>
 
-          {/* Demo Button: Minimalist Ghost / Tinted Row dengan Status Dot Hijau */}
-          <div className="pt-3 border-t border-[#E5E7EB]">
+          {/* Opsi Demo: Hijau Lembut Khas Sistem Kita */}
+          <div className="pt-3 border-t border-[#E5E3DD]">
             <button
               type="button"
               onClick={handleQuickDemo}
               disabled={loading}
-              className="w-full min-h-[42px] px-3.5 py-2 rounded-xl bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#334155] text-[13px] font-medium flex items-center justify-between transition-colors cursor-pointer disabled:opacity-50 group"
+              className="w-full min-h-[46px] px-4 py-2.5 rounded-[14px] bg-[#F0FDF4] hover:bg-[#DCFCE7] border border-[#BBF7D0] text-[#15803D] text-[14px] flex items-center justify-between transition-colors cursor-pointer disabled:opacity-50 font-medium group"
             >
               <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+                <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
                 <span>Coba demo: Opa Budi</span>
               </div>
-              <span className="text-[12px] text-[#64748B] group-hover:text-[#0F172A] transition-colors">
-                Masuk langsung →
-              </span>
+              <CheckCircle2 className="w-4 h-4 text-[#16A34A] opacity-80 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -316,14 +312,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       {/* ================= LANGKAH 2: LENGKAPI PROFIL BARU ================= */}
       {step === 'configure' && (
         <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                <Watch className="w-4 h-4 text-[#0F172A]" aria-hidden="true" />
+          <div className="p-3.5 rounded-[14px] bg-[#FAF9F7] border border-[#E5E3DD] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-white border border-[#E5E3DD] flex items-center justify-center shrink-0">
+                <Watch className="w-4 h-4 text-[#18181B]" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <span className="text-[11.5px] text-[#64748B] block">Perangkat terdeteksi</span>
-                <span className="font-mono text-[13.5px] font-medium text-[#0F172A] truncate block">
+                <span className="text-[12px] text-[#52525B] block">Kode perangkat</span>
+                <span className="font-mono text-[14px] font-medium text-[#18181B] truncate block">
                   {tokenInput || (tokenCode ? `HUAWEI-ECA-${tokenCode}` : 'HUAWEI-ECA-????')}
                 </span>
               </div>
@@ -331,7 +327,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <button
               type="button"
               onClick={() => setStep('scan')}
-              className="text-[12.5px] font-medium text-[#0D9488] hover:underline shrink-0 cursor-pointer"
+              className="hc-btn-secondary px-3 py-1 text-[13px] shrink-0 cursor-pointer"
             >
               Ganti
             </button>
@@ -340,7 +336,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div>
             <label
               htmlFor="elder-name-input"
-              className="block text-[13px] font-medium text-[#334155] mb-1.5"
+              className="block text-[14px] font-medium text-[#18181B] mb-1.5"
             >
               Nama lengkap lansia <span className="text-[#DC2626]">*</span>
             </label>
@@ -351,7 +347,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
               placeholder="Contoh: Opa Budi Santoso"
-              className="w-full min-h-[42px] px-3.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all"
+              className="hc-input w-full px-3.5 py-2.5"
             />
           </div>
 
@@ -359,7 +355,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <div>
               <label
                 htmlFor="elder-age-input"
-                className="block text-[13px] font-medium text-[#334155] mb-1.5"
+                className="block text-[14px] font-medium text-[#18181B] mb-1.5"
               >
                 Usia (tahun)
               </label>
@@ -370,22 +366,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 max={120}
                 value={age}
                 onChange={(e) => setAge(Number(e.target.value))}
-                className="w-full min-h-[42px] px-3.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] text-[#0F172A] focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all"
+                className="hc-input w-full px-3.5 py-2.5"
               />
             </div>
 
             <div>
-              <span className="block text-[13px] font-medium text-[#334155] mb-1.5">
+              <span className="block text-[14px] font-medium text-[#18181B] mb-1.5">
                 Jenis kelamin
               </span>
-              <div className="flex p-1 rounded-xl bg-[#F1F5F9] border border-[#E2E8F0]">
+              <div className="flex p-1 rounded-[12px] bg-[#F3F2EE] border border-[#E5E3DD]">
                 <button
                   type="button"
                   onClick={() => setGender('MALE')}
-                  className={`flex-1 min-h-[34px] text-[13px] rounded-lg transition-all cursor-pointer ${
+                  className={`flex-1 min-h-[36px] text-[13px] rounded-[9px] transition-all cursor-pointer ${
                     gender === 'MALE'
-                      ? 'bg-white text-[#0F172A] font-semibold shadow-2xs'
-                      : 'text-[#64748B] font-medium'
+                      ? 'bg-white text-[#18181B] font-semibold shadow-xs'
+                      : 'text-[#52525B] font-medium'
                   }`}
                 >
                   Laki-laki
@@ -393,10 +389,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setGender('FEMALE')}
-                  className={`flex-1 min-h-[34px] text-[13px] rounded-lg transition-all cursor-pointer ${
+                  className={`flex-1 min-h-[36px] text-[13px] rounded-[9px] transition-all cursor-pointer ${
                     gender === 'FEMALE'
-                      ? 'bg-white text-[#0F172A] font-semibold shadow-2xs'
-                      : 'text-[#64748B] font-medium'
+                      ? 'bg-white text-[#18181B] font-semibold shadow-xs'
+                      : 'text-[#52525B] font-medium'
                   }`}
                 >
                   Perempuan
@@ -408,7 +404,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div>
             <label
               htmlFor="elder-condition-input"
-              className="block text-[13px] font-medium text-[#334155] mb-1.5"
+              className="block text-[14px] font-medium text-[#18181B] mb-1.5"
             >
               Catatan kesehatan
             </label>
@@ -418,15 +414,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               value={conditionSummary}
               onChange={(e) => setConditionSummary(e.target.value)}
               placeholder="Contoh: Riwayat hipertensi ringan atau kondisi stabil"
-              className="w-full min-h-[42px] px-3.5 rounded-xl border border-[#E2E8F0] bg-white text-[14px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10 transition-all"
+              className="hc-input w-full px-3.5 py-2.5"
             />
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2.5">
               {['Hipertensi', 'Diabetes', 'Jantung', 'Kondisi stabil'].map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   onClick={() => setConditionSummary(chip)}
-                  className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] text-[12px] font-medium transition-colors cursor-pointer"
+                  className="hc-chip min-h-[34px] bg-[#FAF9F7] hover:bg-[#F3F2EE] border border-[#E5E3DD] text-[#52525B] hover:text-[#18181B] cursor-pointer text-[12.5px]"
                 >
                   + {chip}
                 </button>
@@ -438,14 +434,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <button
               type="button"
               onClick={() => setStep('scan')}
-              className="px-4 py-2.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[13.5px] font-medium text-[#334155] transition-colors cursor-pointer"
+              className="hc-btn-secondary px-4 py-2.5 text-[14px] cursor-pointer"
             >
               Kembali
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white text-[14px] font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+              className="hc-btn-primary flex-1 px-4 py-2.5 text-[15px] disabled:opacity-50 cursor-pointer"
             >
               {loading ? 'Menyimpan...' : 'Simpan & Masuk'}
             </button>
@@ -458,78 +454,66 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // ================= MODE 1: FULLSCREEN DESKTOP VIEW =================
   if (isFullScreen) {
     return (
-      <div className="min-h-screen w-full relative flex flex-col justify-between bg-[#FAFAFA] bg-dot-grid text-[#0F172A] overflow-x-hidden">
-        {/* Subtle top hairline accent */}
-        <div className="h-[2px] w-full bg-[#E2E8F0]" />
-
+      <div className="min-h-screen w-full relative flex flex-col justify-between bg-[#F7F6F3] text-[#18181B] overflow-x-hidden">
         {/* Main Split-Screen Container */}
-        <main className="w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-10 sm:py-16 lg:py-20 flex-1 flex flex-col justify-center">
+        <main className="w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 sm:py-16 lg:py-20 flex-1 flex flex-col justify-center">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
             
-            {/* SISI KIRI: Editorial & Minimalist (Apple Health / Linear Style) */}
-            <div className="lg:col-span-7 flex flex-col justify-between space-y-10 sm:space-y-12">
-              <div className="space-y-6">
-                {/* Pill Badge */}
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E2E8F0] shadow-2xs text-[12px] font-medium text-[#475569] w-fit">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D9488]" />
-                  <span>ELDERA • AI-Powered Ecosystem</span>
+            {/* SISI KIRI: Tipografi Bersih & Tenang (Konsisten dengan Palet Web) */}
+            <div className="lg:col-span-7 flex flex-col justify-center space-y-6">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-[12px] bg-[#18181B] text-white flex items-center justify-center font-semibold text-base shadow-xs shrink-0"
+                  aria-hidden="true"
+                >
+                  H.
                 </div>
-
-                {/* Tight-tracked Display Headline */}
-                <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-semibold tracking-[-0.035em] leading-[1.12] text-[#0F172A]">
-                  Bridging Distance, <br />
-                  <span className="text-[#64748B]">Protecting Lives.</span>
-                </h1>
-
-                {/* Short, crisp 2-line subtitle */}
-                <p className="text-[16px] sm:text-[17px] text-[#475569] max-w-xl leading-relaxed font-normal">
-                  Continuous biometric telemetry and home safety intelligence, engineered to keep families connected and elders protected with silent confidence.
-                </p>
+                <span className="font-semibold text-lg text-[#18181B] tracking-tight">
+                  ELDERA
+                </span>
               </div>
 
-              {/* Minimalist Live-Status Strip */}
-              <div className="pt-8 border-t border-[#E2E8F0]">
-                <div className="text-[11.5px] uppercase tracking-wider font-semibold text-[#94A3B8] mb-3.5">
-                  Live Telemetry Network
-                </div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#E2E8F0] shadow-2xs text-[13px] font-medium text-[#1E293B]">
-                    <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-                    <span>72 BPM • Normal</span>
-                  </div>
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#E2E8F0] shadow-2xs text-[13px] font-medium text-[#1E293B]">
-                    <span className="w-2 h-2 rounded-full bg-[#64748B]" />
-                    <span>Home Node • 27°C</span>
-                  </div>
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#E2E8F0] shadow-2xs text-[13px] font-medium text-[#1E293B]">
-                    <span className="w-2 h-2 rounded-full bg-[#0D9488]" />
-                    <span>24/7 AI Sentinel</span>
-                  </div>
-                </div>
-              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-[52px] font-semibold tracking-[-0.03em] leading-[1.14] text-[#18181B]">
+                Bridging Distance, <br />
+                <span className="text-[#52525B]">Protecting Lives.</span>
+              </h1>
+
+              <p className="text-[16px] sm:text-[17px] text-[#52525B] max-w-xl leading-relaxed">
+                Ekosistem pendamping lansia cerdas dengan pemantauan biometrik realtime, deteksi darurat instan, dan ketenangan bagi keluarga tercinta.
+              </p>
             </div>
 
-            {/* SISI KANAN: Focused Pure White Login Card (#FFFFFF) */}
+            {/* SISI KANAN: Focused White Card (#FFFFFF) dengan Palet Web */}
             <div className="lg:col-span-5 flex flex-col justify-center">
-              <div className="w-full max-w-[420px] mx-auto bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-8 shadow-sm">
+              <div
+                className="w-full max-w-[430px] mx-auto bg-white border border-[#E5E3DD] rounded-[20px] p-6 sm:p-8"
+                style={{ boxShadow: 'var(--shadow-card)' }}
+              >
                 {renderCardContent()}
+              </div>
+
+              {/* Catatan Privasi UU PDP */}
+              <div className="mt-4 flex items-center justify-center gap-2 text-[13px] text-[#52525B] text-center">
+                <ShieldCheck className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
+                <span>Data pribadi terlindungi sesuai UU PDP No. 27/2022</span>
               </div>
             </div>
 
           </div>
         </main>
 
-        {/* Ultra-minimal Single-Line Footer */}
-        <footer className="w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-[12.5px] text-[#64748B] border-t border-[#E5E7EB]">
+        {/* Footer Minimalis Satu Baris */}
+        <footer className="w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[13px] text-[#71717A] border-t border-[#E5E3DD]">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#0D9488]" aria-hidden="true" />
-            <span>Data pribadi terlindungi sesuai UU PDP No. 27/2022</span>
+            <span>© 2026 ELDERA</span>
+            <span>•</span>
+            <span>Healthcare Ecosystem</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <span>Team Stratos • LPKIA</span>
-            <span className="text-[#CBD5E1]">•</span>
-            <span className="font-medium text-[#475569]">Huawei ICT Competition 2026</span>
+            <span>Team Stratos | LPKIA</span>
+            <span>•</span>
+            <span className="font-medium text-[#18181B]">Huawei ICT Competition 2026</span>
           </div>
         </footer>
 
@@ -547,16 +531,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-[2px] p-4 sm:p-6"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 sm:p-6 hc-fade-soft"
         role="dialog"
         aria-modal="true"
         aria-labelledby="pairing-title"
       >
-        <div className="w-full max-w-[420px] bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-7 shadow-lg">
+        <div
+          className="w-full max-w-[430px] bg-white border border-[#E5E3DD] rounded-[20px] p-6 sm:p-7"
+          style={{ boxShadow: 'var(--shadow-popover)' }}
+        >
           {renderCardContent()}
 
-          <p className="mt-4 flex items-center justify-center gap-2 text-[12px] text-[#64748B] text-center pt-3 border-t border-[#E5E7EB]">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#0D9488] shrink-0" aria-hidden="true" />
+          <p className="mt-4 flex items-center justify-center gap-2 text-[12.5px] text-[#52525B] text-center pt-3 border-t border-[#E5E3DD]">
+            <ShieldCheck className="w-4 h-4 text-[#15803D] shrink-0" aria-hidden="true" />
             <span>Data pribadi terlindungi sesuai UU PDP No. 27/2022</span>
           </p>
         </div>
