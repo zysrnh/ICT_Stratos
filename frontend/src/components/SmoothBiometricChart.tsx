@@ -14,23 +14,28 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
   // Maksimal 20 pembacaan terbaru secara kronologis (terlama di kiri, terbaru di kanan)
   const chartData = [...metrics.slice(0, 20)].reverse();
 
-  // Dimensi SVG yang ringkas & proporsional
-  const width = 680;
-  const height = 210;
-  const padLeft = 42;
-  const padRight = viewMode === 'combined' ? 42 : 20;
-  const padTop = 20;
-  const padBottom = 20;
+  // Dimensi SVG responsif & proporsional penuh
+  const width = 1000;
+  const height = 240;
+  const padLeft = 46;
+  const padRight = viewMode === 'combined' ? 46 : 24;
+  const padTop = 24;
+  const padBottom = 22;
 
   const chartW = width - padLeft - padRight;
   const chartH = height - padTop - padBottom;
   const baseY = padTop + chartH;
 
-  // Rentang Skala Heart Rate (BPM) & Suhu (°C)
-  const hrMin = 40;
-  const hrMax = 160;
-  const tempMin = 22;
-  const tempMax = 42;
+  // Rentang Skala Dinamis & Proporsional (Mencegah garis gepeng di dasar)
+  const maxHrInData = Math.max(...chartData.map((d) => d.heart_rate ?? 75), 100);
+  const hrMax = maxHrInData > 115 ? Math.min(160, Math.ceil(maxHrInData / 10) * 10 + 10) : 120;
+  const hrMin = 50;
+
+  const tempMin = 24;
+  const tempMax = 38;
+
+  const hrTicks = hrMax > 120 ? [60, 80, 100, 120, hrMax] : [60, 75, 90, 105, 120];
+  const tempTicks = [26, 30, 34, 38];
 
   const hrPoints = chartData.map((d, index) => {
     const val = d.heart_rate ?? 72;
@@ -119,9 +124,6 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
   const tempPath = generateMonotonePath(tempPoints);
   const tempAreaPath = generateAreaPath(tempPoints, tempPath);
 
-  const hrTicks = [50, 75, 100, 125, 150];
-  const tempTicks = [24, 30, 36, 42];
-
   const showHR = viewMode === 'combined' || viewMode === 'heart_rate';
   const showTemp = viewMode === 'combined' || viewMode === 'temperature';
 
@@ -206,16 +208,16 @@ export const SmoothBiometricChart: React.FC<SmoothBiometricChartProps> = ({ metr
         </div>
       </div>
 
-      {/* Kanvas SVG Tinggi Terbatas */}
-      <div className="relative w-full max-h-[225px] select-none">
+      {/* Kanvas SVG Responsif Penuh */}
+      <div className="relative w-full select-none">
         {chartData.length === 0 ? (
-          <div className="h-[190px] flex items-center justify-center text-[15px] text-[#71717A]">
+          <div className="h-[200px] flex items-center justify-center text-[15px] text-[#71717A]">
             Menunggu data pembacaan dari jam tangan...
           </div>
         ) : (
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-auto max-h-[215px] overflow-visible"
+            className="w-full h-auto overflow-visible"
             role="img"
             aria-label="Grafik garis detak jantung dan suhu"
           >
