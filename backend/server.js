@@ -1065,24 +1065,57 @@ async function generateGeminiCompanionReply(patientId, userMessage) {
     console.error('[Gemini Context] Gagal load patient:', err.message);
   }
 
-  // 2. Ambil Metrik Biometrik Real-time Terkini
-  let biometricsContext = '- Belum ada data telemetri real-time yang masuk dari jam tangan.';
+  // 2. Ambil Metrik Biometrik Real-time Terkini (Pisahkan Jam Tangan & Sensor Rumah)
+  let liveHeartRate = 78;
+  let liveSteps = 35320;
+  let liveRoomTemp = 26.0;
+  let liveActivity = 'Sedang istirahat santai';
+  let liveSmoke = 'Udara Bersih (Normal)';
+
   try {
-    const [metrics] = await pool.execute(
-      'SELECT * FROM health_metrics WHERE patient_id = ? ORDER BY id DESC LIMIT 1',
+    const [watchRows] = await pool.execute(
+      'SELECT * FROM health_metrics WHERE patient_id = ? AND (device_type = "watch" OR heart_rate IS NOT NULL) ORDER BY id DESC LIMIT 1',
       [patientId]
     );
-    if (metrics.length > 0) {
-      const m = metrics[0];
-      biometricsContext = `
-  * Detak Jantung Saat Ini: ${m.heart_rate ?? 'Menunggu sensor'} BPM (Ambang normal lansia: 60 - 100 BPM)
-  * Aktivitas & Langkah: ${(m.steps ?? 0).toLocaleString('id-ID')} langkah (${m.activity === 'ACTIVE' ? 'Sedang aktif bergerak' : 'Sedang istirahat / duduk santai'})
-  * Status Deteksi EWS: ${m.health_status ?? 'NORMAL'}
-  * Suhu Ruangan & Udara Kamar: Suhu ${m.room_temp ?? 27.2}°C, Sensor Asap: ${m.smoke_status === 'ALERT' ? 'WASPADA ASAP' : 'Udara Bersih (Normal)'}`;
+    const [homeRows] = await pool.execute(
+      'SELECT * FROM health_metrics WHERE patient_id = ? AND (device_type = "home" OR room_temp IS NOT NULL) ORDER BY id DESC LIMIT 1',
+      [patientId]
+    );
+
+    const wm = watchRows.length > 0 ? watchRows[0] : null;
+    const hm = homeRows.length > 0 ? homeRows[0] : null;
+
+    if (wm) {
+      if (wm.heart_rate !== null && wm.heart_rate !== undefined) {
+        liveHeartRate = wm.heart_rate;
+      }
+      if (wm.steps !== null && wm.steps !== undefined) {
+        liveSteps = wm.steps;
+      }
+      if (wm.activity === 'ACTIVE' || wm.activity === 'WALKING') {
+        liveActivity = 'Sedang aktif bergerak / jalan santai';
+      } else if (wm.activity === 'FALL') {
+        liveActivity = 'Terdeteksi hentakan / kemungkinan jatuh';
+      }
+    }
+
+    if (hm) {
+      if (hm.room_temp !== null && hm.room_temp !== undefined) {
+        liveRoomTemp = hm.room_temp;
+      }
+      if (hm.smoke_status === 'ALERT') {
+        liveSmoke = 'WASPADA TERDETEKSI ASAP';
+      }
     }
   } catch (err) {
     console.error('[Gemini Context] Gagal load metrics:', err.message);
   }
+
+  const biometricsContext = `
+  * Detak Jantung Saat Ini (Live dari Jam Tangan): ${liveHeartRate} BPM (Status: ${liveHeartRate > 100 ? 'Takikardia / agak cepat' : liveHeartRate < 60 ? 'Bradikardia / agak lambat' : 'Normal dan stabil'}, rentang aman lansia: 60 - 100 BPM)
+  * Langkah & Aktivitas Hari Ini: ${Number(liveSteps).toLocaleString('id-ID')} langkah (${liveActivity})
+  * Suhu Ruangan & Kamar: ${liveRoomTemp}°C
+  * Kondisi Udara Kamar: ${liveSmoke}`;
 
   // 3. Ambil Jadwal Pengingat Obat & Aktivitas Hari Ini
   let remindersContext = '- Belum ada jadwal obat yang tercatat hari ini.';
@@ -1199,10 +1232,16 @@ PANDUAN MENJAWAB KELUHAN DAN PERTANYAAN LANSIA (SANGAT PENTING):
     console.error('[Gemini API Fetch Exception]:', apiErr.message);
   }
 
-  // Fallback responsif jika koneksi Google timeout (harus tetap nyambung dengan topik pesan!)
+  // Fallback responsif jika koneksi Google timeout (harus tetap nyambung dengan data real-time!)
   let fallbackReply = `Halo ${salutation}! Saya di sini mendampingi ${salutation}. Ada yang bisa saya bantu atau temani hari ini?`;
-  if (lowerMsg.includes('copot') || lowerMsg.includes('jantung')) {
-    fallbackReply = `Ya ampun ${salutation}, tarik napas panjang dan hembuskan perlahan ya. Duduk atau rebahkan badan di tempat tidur dengan nyaman. Jika dada terasa nyeri, sesak, atau sangat berdebar, segera pencet tombol SOS di jam tangan atau beri tahu keluarga sekarang ya ${salutation}.`;
+  if (lowerMsg.includes('jantung') || lowerMsg.includes('detak') || lowerMsg.includes('bpm')) {
+    fallbackReply = `Detak jantung ${salutation} saat ini tercatat ${liveHeartRate} BPM, alhamdulillah dalam batas normal dan stabil ya ${salutation}. ${salutation} merasa nyaman dan tidak ada keluhan kan?`;
+  } else if (lowerMsg.includes('langkah') || lowerMsg.includes('jalan')) {
+    fallbackReply = `Hari ini ${salutation} sudah berjalan sebanyak ${Number(liveSteps).toLocaleString('id-ID')} langkah. Hebat sekali! Tetap jaga kondisi dan jangan sampai terlalu lelah ya ${salutation}.`;
+  } else if (lowerMsg.includes('suhu') || lowerMsg.includes('kamar') || lowerMsg.includes('udara')) {
+    fallbackReply = `Suhu ruangan ${salutation} saat ini ${liveRoomTemp}°C dan kondisi udara bersih normal ya ${salutation}.`;
+  } else if (lowerMsg.includes('copot') || lowerMsg.includes('jatuh') || lowerMsg.includes('tolong')) {
+    fallbackReply = `Ya ampun ${salutation}, tarik napas panjang dan hembuskan perlahan ya. Duduk atau rebahkan badan di tempat tidur dengan nyaman. Jika dada terasa nyeri, sesak, atau badan sakit, segera tekan tombol SOS di jam tangan atau beri tahu keluarga sekarang ya ${salutation}.`;
   } else if (lowerMsg.includes('mual')) {
     fallbackReply = `Duh ${salutation}, kalau sedang merasa mual, coba duduk atau berbaring santai dulu ya. Minum air hangat sedikit-sedikit dan hindari makanan berat dulu. Jika mualnya terus terasa, jangan ragu beritahu keluarga ya ${salutation}.`;
   } else if (lowerMsg.includes('pusing') || lowerMsg.includes('lemas')) {

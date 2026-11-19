@@ -169,7 +169,7 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
                       >
                         {rem.title}
                       </h3>
-                      {rem.is_confirmed && rem.confirmed_at && (
+                      {rem.is_confirmed && rem.confirmed_at ? (
                         <span className="text-[13px] text-[#166534] block mt-0.5">
                           Selesai pukul{' '}
                           {new Date(rem.confirmed_at).toLocaleTimeString('id-ID', {
@@ -177,7 +177,7 @@ export const AiCompanionView: React.FC<AiCompanionViewProps> = ({ session }) => 
                             minute: '2-digit',
                           })}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 

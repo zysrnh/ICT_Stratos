@@ -202,7 +202,7 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Konten Utama */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-[1280px] mx-auto w-full pb-28 md:pb-10">
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 w-full pb-16 md:pb-8">
         {/* Header Bar Ramah dengan Popover Mode Simulasi & Avatar Menu */}
         <Header
           alertCount={activeAlertCount}

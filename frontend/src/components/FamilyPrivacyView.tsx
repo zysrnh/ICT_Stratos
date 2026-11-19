@@ -107,11 +107,11 @@ export const FamilyPrivacyView: React.FC<FamilyPrivacyViewProps> = ({ session })
                     <span className="hc-chip bg-white text-[#52525B] border border-[#E5E3DD]">
                       Prioritas {c.priority_order}
                     </span>
-                    {c.is_primary && (
+                    {c.is_primary ? (
                       <span className="hc-chip bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
                         Kontak utama
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   <h3 className="text-[15px] font-semibold text-[#18181B] truncate">{c.name}</h3>
                   <p className="text-[13px] text-[#52525B]">{c.relationship}</p>

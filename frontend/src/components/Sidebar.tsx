@@ -36,7 +36,7 @@ export const Sidebar: React.FC<NavProps> = ({
   return (
     <aside
       aria-label="Navigasi utama"
-      className="hidden md:flex w-20 flex-col items-center py-6 px-2.5 bg-[#1C1C1F] text-white shrink-0 select-none z-20"
+      className="hidden md:flex w-20 flex-col items-center py-6 px-2.5 bg-[#1C1C1F] text-white shrink-0 select-none z-20 sticky top-0 h-screen"
     >
       {/* Satu Logo Tunggal */}
       <div className="mb-8 flex items-center justify-center">
