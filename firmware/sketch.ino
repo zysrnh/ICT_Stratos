@@ -58,10 +58,10 @@ const char* WIFI_PASS = "";
 #endif
 const char* URL_TELEMETRY = API_BASE "/api/telemetry";
 const char* URL_EVENTS    = API_BASE "/api/events";
-char activeToken[32]      = "HUAWEI-ECA-74E7";   // Token ID default stabil (Sesuai sesi aktif Web Dashboard)
+char activeToken[32]      = "HUAWEI-ECA-INIT";   // Diacak unik otomatis saat boot di setup()
 bool isPaired             = false;                // False: Standby di layar QR | True: Aktif monitoring
-char pairedPatientName[64]= "Lansia Terhubung";
-int  pairedPatientId      = 16;  // ID Pasien aktif (Sinkron dinamis dengan Web)
+char pairedPatientName[64]= "Menunggu Pairing Web...";
+int  pairedPatientId      = 0;                    // ID Pasien aktif (Sinkron dinamis setelah dipasangkan di Web)
 
 // ==========================================
 // Identitas
@@ -866,7 +866,13 @@ void setup() {
   Serial.println("\n=== AI-Powered Elderly Care - Device Layer ===");
   bootId = esp_random();
 
-  // Token ID default stabil: HUAWEI-ECA-74E7 (Ketik 'token new' di Serial jika ingin acak baru)
+  // Acak Token Unik Baru di Setiap Boot (Garansi 100% Bersih & Standby di Layar QR)
+  uint16_t randSuffix = (uint16_t)((esp_random() ^ (micros() & 0xFFFF)) & 0xFFFF);
+  if (randSuffix < 0x1000) randSuffix |= 0x1000;
+  snprintf(activeToken, sizeof(activeToken), "HUAWEI-ECA-%04X", randSuffix);
+  isPaired = false;
+  pairedPatientId = 0;
+  strlcpy(pairedPatientName, "Menunggu Pairing Web...", sizeof(pairedPatientName));
 
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_SYNC, OUTPUT);
