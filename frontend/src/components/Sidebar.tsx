@@ -42,9 +42,9 @@ export const Sidebar: React.FC<NavProps> = ({
       <div className="mb-8 flex items-center justify-center">
         <div
           className="w-11 h-11 rounded-[14px] bg-white/12 border border-white/15 text-white flex items-center justify-center font-semibold text-lg"
-          aria-label="Sahabat Lansia"
+          aria-label="ELDERA"
         >
-          H.
+          E.
         </div>
       </div>
 
