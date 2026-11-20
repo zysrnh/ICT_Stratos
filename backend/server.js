@@ -780,7 +780,7 @@ app.post('/api/telemetry', verifyDeviceOrAuth, async (req, res) => {
     await pool.execute(
       `INSERT INTO devices (id, patient_id, device_token, device_type, model_name, status, last_seen)
        VALUES (?, ?, ?, ?, ?, 'ONLINE', NOW())
-       ON DUPLICATE KEY UPDATE status = 'ONLINE', last_seen = NOW(), device_token = VALUES(device_token)`,
+       ON DUPLICATE KEY UPDATE status = 'ONLINE', last_seen = NOW(), device_token = VALUES(device_token), patient_id = VALUES(patient_id)`,
       [device_id, targetPatientId, activeToken, type === 'home' ? 'home' : 'watch', device_id]
     );
 
@@ -874,6 +874,12 @@ app.post('/api/events', verifyDeviceOrAuth, async (req, res) => {
          WHERE patient_id = ? AND alert_type = ? AND is_resolved = FALSE`,
         [targetPatientId, event_type]
       );
+      // Bersihkan juga event serupa yang masih berstatus PENDING / ESCALATED agar tidak menggantung
+      await pool.execute(
+        `UPDATE emergency_events SET status = 'RESOLVED', updated_at = NOW()
+         WHERE patient_id = ? AND event_type = ? AND status IN ('PENDING', 'ESCALATED')`,
+        [targetPatientId, event_type]
+      );
     }
 
     res.status(200).json({
@@ -884,6 +890,30 @@ app.post('/api/events', verifyDeviceOrAuth, async (req, res) => {
   } catch (error) {
     console.error('[Event Error]:', error);
     res.status(500).json({ error: 'Gagal memproses event darurat', details: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// Endpoint 3b: Selesaikan Semua Kejadian Darurat Aktif (Bulk Resolve)
+// -------------------------------------------------------------
+app.post('/api/events/resolve-all', verifyDeviceOrAuth, async (req, res) => {
+  try {
+    const targetPatientId = req.deviceInfo?.patient_id || req.body.patient_id || 1;
+    await pool.execute(
+      "UPDATE emergency_events SET status = 'RESOLVED', updated_at = NOW() WHERE patient_id = ? AND status IN ('PENDING', 'ESCALATED')",
+      [targetPatientId]
+    );
+    await pool.execute(
+      "UPDATE health_alerts SET is_resolved = TRUE WHERE patient_id = ? AND is_resolved = FALSE",
+      [targetPatientId]
+    );
+    res.json({
+      success: true,
+      message: `Semua kejadian darurat untuk pasien ID ${targetPatientId} berhasil di-resolve.`
+    });
+  } catch (err) {
+    console.error('[Resolve All Error]:', err);
+    res.status(500).json({ error: 'Gagal meresolve semua events', details: err.message });
   }
 });
 

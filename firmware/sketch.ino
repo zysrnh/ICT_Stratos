@@ -186,6 +186,7 @@ const char* healthStatus() {
 }
 
 bool btnEdge(Btn &b) {
+  if (millis() < 3000UL) return false; // Abaikan transien sinyal saat inisialisasi boot
   bool r = digitalRead(b.pin);
   bool pressed = false;
   if (r != b.last && millis() - b.t > 40) {
@@ -425,7 +426,7 @@ int postJson(const char* url, const char* body) {
             noTone(BUZZER_PIN);
             digitalWrite(BUZZER_PIN, LOW);
             Serial.println("[Cloud Sync ✅] Web menormalkan status -> Alarm Wokwi mati & kembali NORMAL!");
-          } else if (hasEmerg) {
+          } else if (hasEmerg && millis() > 8000UL) {
             const char* evType = doc["active_event_type"] | "SOS";
             AlertKind targetKind = K_SOS;
             if (!strcmp(evType, "FALL")) targetKind = K_FALL;
@@ -873,6 +874,10 @@ void setup() {
   pinMode(SMOKE_PIN, INPUT);
   pinMode(BTN_SOS, INPUT_PULLUP);
   pinMode(BTN_OK, INPUT_PULLUP);
+  btnSos.last = HIGH;
+  btnSos.t = millis();
+  btnOk.last = HIGH;
+  btnOk.t = millis();
   digitalWrite(BUZZER_PIN, LOW);
   noTone(BUZZER_PIN);
   digitalWrite(LED_SYNC, LOW);
@@ -1005,10 +1010,6 @@ void loop() {
     smokeEma += 0.3f * (target - smokeEma);
     evalHome();
   }
-
-  // --- Tombol Fisik ---
-  if (btnEdge(btnSos)) raiseAlert(K_SOS, 0, "CRITICAL", false);
-  if (btnEdge(btnOk))  onOkPressed();
 
   updateAlertLogic(now);
   updateBuzzer(now);

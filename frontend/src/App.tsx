@@ -23,6 +23,7 @@ import {
   fetchEmergencyContacts,
   triggerSimulatedEvent,
   sendSimulatedTelemetry,
+  resolveAllEmergencyEvents,
   getSavedSession,
   clearSession,
 } from './services/api';
@@ -103,9 +104,10 @@ export const App: React.FC = () => {
   const handleResolveEvent = async (eventId: string) => {
     const ev = events.find((e) => e.event_id === eventId);
     if (ev) {
-      await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
-      loadAllData();
+      await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0, ev.event_id);
     }
+    await resolveAllEmergencyEvents(session?.patient_id);
+    await loadAllData();
   };
 
   // Ekstraksi data metrik terbaru untuk Watch dan Home Node
@@ -150,11 +152,8 @@ export const App: React.FC = () => {
   const handleResetNormal = async () => {
     try {
       // 1. Selesaikan semua kejadian darurat yang masih aktif di database
-      for (const ev of events) {
-        if (ev.status === 'PENDING' || ev.status === 'ESCALATED') {
-          await triggerSimulatedEvent(ev.event_type as any, 'RESOLVED', 0);
-        }
-      }
+      await resolveAllEmergencyEvents(session?.patient_id);
+
       // 2. Injeksi telemetri normal (HR 72, Asap aman 310 ADC, Suhu 27.0)
       await sendSimulatedTelemetry({
         heart_rate: 72,

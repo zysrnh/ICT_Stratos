@@ -345,15 +345,33 @@ export async function toggleConsent(consentId: number, isGranted: boolean): Prom
   }
 }
 
+// Selesaikan semua kejadian darurat yang masih aktif (Sinkron tuntas ke Server & Wokwi)
+export async function resolveAllEmergencyEvents(patientId?: number): Promise<boolean> {
+  try {
+    const session = getSavedSession();
+    const pid = patientId ?? session?.patient_id ?? 1;
+    const res = await fetch(`${API_BASE}/events/resolve-all`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ patient_id: pid }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('[Resolve All Events Error]:', err);
+    return false;
+  }
+}
+
 // Fitur Simulasi Pengujian: Memicu simulasi darurat langsung dari UI
 export async function triggerSimulatedEvent(
   eventType: 'FALL' | 'SOS' | 'SMOKE' | 'HR_ABNORMAL',
   status: 'PENDING' | 'ESCALATED' | 'CANCELLED' | 'RESOLVED' = 'PENDING',
-  value = 3.2
+  value = 3.2,
+  specificEventId?: string
 ): Promise<boolean> {
   try {
     const session = getSavedSession();
-    const eventId = `SIM-${eventType}-${Date.now().toString().slice(-4)}`;
+    const eventId = specificEventId || `SIM-${eventType}-${Date.now().toString().slice(-4)}`;
     const res = await fetch(`${API_BASE}/events`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -368,6 +386,9 @@ export async function triggerSimulatedEvent(
         sim: true,
       }),
     });
+    if (status === 'RESOLVED') {
+      await resolveAllEmergencyEvents(session?.patient_id);
+    }
     return res.ok;
   } catch (err) {
     console.error('[Trigger Sim Event Error]:', err);
